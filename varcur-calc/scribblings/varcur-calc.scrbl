@@ -8,3 +8,9 @@
 
 This is an implementation of a small, untyped lambda calculus with support for
 both automated currying and variadic functions.
+@;
+@table-of-contents[]
+
+@;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+@; End of file.

@@ -8,6 +8,9 @@ default: install
 install:
 	raco pkg install --auto "$(PACKAGE)/"
 
+setup:
+	raco setup --pkgs varcur-calc
+
 remove:
 	@raco pkg remove --auto $(PACKAGE) \
 	  || (echo "\nConsider removing the dependent packages listed above by doing:" \
