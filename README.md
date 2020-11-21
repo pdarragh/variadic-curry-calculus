@@ -1,2 +1,4 @@
-# variadic-curry-calculus
-Simple untyped lambda calculus that supports both variadic functions and auto-currying.
+# Variadic Auto-Curried Lambda Calculus
+
+A simple untyped lambda calculus interpreter that supports both variadic
+functions and auto-currying.
