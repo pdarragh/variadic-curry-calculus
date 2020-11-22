@@ -65,7 +65,10 @@
        (cond
          [(clo-ffi? interp-func)
           ;; FFI application has to intercept the currying because Racket is not curried.
-          (eval `(,(clo-ffi-func interp-func) ,arg ,@args))]
+          (let ([interp-arg (interp arg env)]
+                [interp-args (map (λ (arg) (interp arg env))
+                                  args)])
+            (eval `(,(clo-ffi-func interp-func) ,interp-arg ,@interp-args)))]
          [else
           ;; multary application
           (let ([interp-app (interp (list func arg) env)])
@@ -75,7 +78,12 @@
      (let ([interp-func (interp func env)])
        (match interp-func
          [(struct clo-ffi (ffi-func))
-          (eval `(,ffi-func ,@args))]
+          (match args
+            [(list)
+             (eval `(,ffi-func))]
+            [(list arg)
+             (let ([interp-arg (interp arg env)])
+               (eval `(,ffi-func ,arg)))])]
          [(struct clo (#f c-body c-env))
           ;; function is nullary
           (match args
