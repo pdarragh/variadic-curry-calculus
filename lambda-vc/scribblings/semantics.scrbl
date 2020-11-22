@@ -3,17 +3,13 @@
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-@require[@for-label[lambda-sup/base
+@require[@for-label[lambda-vc/base
                     racket/contract]]
 
-@title[#:tag "sec:api"]{Lambda-Sup API}
+@title[#:tag "sec:semantics"]{λ@subscript{vc} Semantics}
 @author[(@author+email "Pierce Darragh" "pierce.darragh@gmail.com")]
 
-@defmodule[lambda-sup]
-
-@defproc[(interp [exp any/c] [env (listof pair?)]) value?]{
-Function function function.
-}
+Some stuff.
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

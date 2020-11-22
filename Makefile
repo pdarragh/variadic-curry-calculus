@@ -1,7 +1,7 @@
 .DEFAULT_GOAL: default
 .PHONY: default install remove
 
-PACKAGE := lambda-sup
+PACKAGE := lambda-vc
 
 default: install
 

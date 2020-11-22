@@ -3,13 +3,15 @@
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-@require[@for-label[lambda-sup/base
-                    racket/contract]]
-
-@title[#:tag "sec:semantics"]{Lambda-Sup Semantics}
+@title{λ@subscript{vc}: Variadic Auto-Curried Lambda Calculus}
 @author[(@author+email "Pierce Darragh" "pierce.darragh@gmail.com")]
 
-Some stuff.
+This is an implementation of a small, untyped lambda calculus with support for
+both automated currying and variadic functions.
+@;
+@table-of-contents[]
+@include-section["api.scrbl"]
+@include-section["semantics.scrbl"]
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
