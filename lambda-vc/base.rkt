@@ -7,9 +7,10 @@
 (struct clo (formal body env) #:transparent)
 (struct clo-v clo () #:transparent)
 (struct supos (left right env) #:transparent)
+(struct clo-ffi (func) #:transparent)
 
 (define mt-env empty)
-(define (extend-env env name value)
+(define (extend-env name value env)
   (cons (cons name value) env))
 (define (env-lookup env name)
   (match env
@@ -19,10 +20,23 @@
          l-value
          (env-lookup rest-env name))]))
 
+(define prelude
+  (foldl (λ (pair env)
+           (extend-env (car pair)
+                       (cdr pair)
+                       env))
+         mt-env
+         (list
+          (cons '+ (clo-ffi +))
+          (cons '- (clo-ffi -))
+          (cons '* (clo-ffi *))
+          (cons '/ (clo-ffi /)))))
+
 (define (value? x)
   (or (integer? x)
       (clo? x)
       (clo-v? x)
+      (clo-ffi? x)
       (supos? x)))
 
 (define (interp exp env)
@@ -47,13 +61,21 @@
         ;; auto-curried function
         (clo (param formal) `(λ ,formals ,body) env)])]
     [`(,func ,@(list arg args ..1))
-     ;; binary+ application
-     (let ([interp-app (interp (list func arg) env)])
-       (interp `(,interp-app ,@args) env))]
+     (let ([interp-func (interp func env)])
+       (cond
+         [(clo-ffi? interp-func)
+          ;; FFI application has to intercept the currying because Racket is not curried.
+          (eval `(,(clo-ffi-func interp-func) ,arg ,@args))]
+         [else
+          ;; multary application
+          (let ([interp-app (interp (list func arg) env)])
+            (interp `(,interp-app ,@args) env))]))]
     [(list func args ...)  ;; NOTE: Can be rewritten as: `(,func ,args ...)
      ;; nullary or unary application
      (let ([interp-func (interp func env)])
        (match interp-func
+         [(struct clo-ffi (ffi-func))
+          (eval `(,ffi-func ,@args))]
          [(struct clo (#f c-body c-env))
           ;; function is nullary
           (match args
@@ -69,7 +91,7 @@
             [(list arg)
              ;; unary application
              (let* ([interp-arg (interp arg env)]
-                    [new-env (extend-env c-env c-param-name interp-arg)]
+                    [new-env (extend-env c-param-name interp-arg c-env)]
                     [interp-body (interp c-body new-env)])
                (cond
                  [(clo-v? interp-func)
