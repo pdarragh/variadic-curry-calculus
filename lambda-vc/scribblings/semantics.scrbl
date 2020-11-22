@@ -80,141 +80,128 @@ Some stuff.
 This is the operational semantics.
 
 @$${
-  {
-    @t{1} \to @t{1}'
-    \over
-    {
-      \left( @t{1}\ @t{2}^{\ast} \right)
-      \to
-      \left(@v{1}^{+}\ @t{2}'\ @t{3}^{\ast} \right)
-    }
-  }
-  \qquad
-  @mk-rule-name{E-App1}
-}
+\tt
+\begin{array}{lc}
 
-@$${
-  {
-    @t{2} \to @t{2}'
-    \over
-    {
-      \left( @v{1}^{+}\ @t{2}\ @t{3}^{\ast} \right)
-      \to
-      \left( @v{1}^{+}\ @t{2}'\ @t{3}^{\ast} \right)
-    }
-  }
-  \qquad
-  @mk-rule-name{E-App2}
-}
+@mk-rule-name{E-App1}
+  & {
+      @t{1} \to @t{1}'
+      \over
+      {
+        \left( @t{1}\ @t{2}^{\ast} \right)
+        \to
+        \left(@v{1}^{+}\ @t{2}'\ @t{3}^{\ast} \right)
+      }
+  } \\
+  & \\
 
-@$${
-  {
-    \left( \left( \lambda \left(\ \right) @t{1} \right) \right)
-    \to
-    @t{1}
-  }
-  \qquad
-  @mk-rule-name{E-AppNull}
-}
+@mk-rule-name{E-App2}
+  & {
+      @t{2} \to @t{2}'
+      \over
+      {
+        \left( @v{1}^{+}\ @t{2}\ @t{3}^{\ast} \right)
+        \to
+        \left( @v{1}^{+}\ @t{2}'\ @t{3}^{\ast} \right)
+      }
+  } \\
+  & \\
 
-@$${
-  {
-    \left( \left( \lambda \left( @(x) \right) @t{1} \right) @v{2} \right)
-    \to
-    @t{1}\left[@v{2} \middle/ @(x)\right]
-  }
-  \qquad
-  @mk-rule-name{E-AppUnary}
-}
+@mk-rule-name{E-AppNull}
+  & {
+      \left( \left( \lambda \left(\ \right) @t{1} \right) \right)
+      \to
+      @t{1}
+  } \\
+  & \\
 
-@$${
-  {
-    {
-      \left( @v{1}\ @v{2} \right)
+@mk-rule-name{E-AppUnary}
+  & {
+      \left( \left( \lambda \left( @(x) \right) @t{1} \right) @v{2} \right)
       \to
-      @t{12}
-    }
-    \over
-    {
-      \left( @v{1}\ @v{2}\ @v{3}^{+} \right)
-      \to
-      \left( @t{12}\ @v{3}^{+} \right)
-    }
-  }
-  \qquad
-  @mk-rule-name{E-AppUncurry}
-}
+      @t{1}\left[@v{2} \middle/ @(x)\right]
+  } \\
+  & \\
 
-@$${
-  {
-    {
-      \left( @t{1}\ @v{2} \right)
-      \to
-      @t{12}
-    }
-    \over
-    {
-      \left( \left( \lambda \left( @(x)\ \ldots \right) @t{1} \right) @v{2} \right)
-      \to
-      \left( \sigma\ @t{12} \left( \lambda \left( @(x)\ \ldots \right) @t{12} \right) \right)
-    }
-  }
-  \qquad
-  @mk-rule-name{E-AppVariadic}
-}
+@mk-rule-name{E-AppUncurry}
+  & {
+      {
+        \left( @v{1}\ @v{2} \right)
+        \to
+        @t{12}
+      }
+      \over
+      {
+        \left( @v{1}\ @v{2}\ @v{3}^{+} \right)
+        \to
+        \left( @t{12}\ @v{3}^{+} \right)
+      }
+  } \\
+  & \\
 
-@$${
-  {
-    {
-      \left( @t{1}\ @v{3} \right) \to @v{4}
-      \qquad
-      \left( @t{2}\ @v{3} \right) \to @v{5}
-    }
-    \over
-    {
-      \left( \left( \sigma\ @t{1}\ @t{2} \right) @v{3} \right)
-      \to
-      \left( \sigma\ @v{4}\ @v{5} \right)
-    }
-  }
-  \qquad
-  @mk-rule-name{E-AppSuper}
-}
+@mk-rule-name{E-AppVariadic}
+  & {
+      {
+        \left( @t{1}\ @v{2} \right)
+        \to
+        @t{12}
+      }
+      \over
+      {
+        \left( \left( \lambda \left( @(x)\ \ldots \right) @t{1} \right) @v{2} \right)
+        \to
+        \left( \sigma\ @t{12} \left( \lambda \left( @(x)\ \ldots \right) @t{12} \right) \right)
+      }
+  } \\
+  & \\
 
-@$${
-  {
-    {
-      \left( @t{1}\ @v{3} \right) \to \epsilon
-      \qquad
-      \left( @t{2}\ @v{3} \right) \to @v{4}
-    }
-    \over
-    {
-      \left( \left( \sigma\ @t{1}\ @t{2} \right) @v{3} \right)
-      \to
-      @v{4}
-    }
-  }
-  \qquad
-  @mk-rule-name{E-AppSuperErr1}
-}
+@mk-rule-name{E-AppSuper}
+  & {
+      {
+        \left( @t{1}\ @v{3} \right) \to @v{4}
+        \qquad
+        \left( @t{2}\ @v{3} \right) \to @v{5}
+      }
+      \over
+      {
+        \left( \left( \sigma\ @t{1}\ @t{2} \right) @v{3} \right)
+        \to
+        \left( \sigma\ @v{4}\ @v{5} \right)
+      }
+  } \\
+  & \\
 
-@$${
-  {
-    {
-      \left( @t{1}\ @v{3} \right) \to @v{4}
-      \qquad
-      \left( @t{2}\ @v{3} \right) \to \epsilon
-    }
-    \over
-    {
-      \left( \left( \sigma\ @t{1}\ @t{2} \right) @v{3} \right)
-      \to
-      @v{4}
-    }
-  }
-  \qquad
-  @mk-rule-name{E-AppSuperErr2}
+@mk-rule-name{E-AppSuperErr1}
+  & {
+      {
+        \left( @t{1}\ @v{3} \right) \to \epsilon
+        \qquad
+        \left( @t{2}\ @v{3} \right) \to @v{4}
+      }
+      \over
+      {
+        \left( \left( \sigma\ @t{1}\ @t{2} \right) @v{3} \right)
+        \to
+        @v{4}
+      }
+  } \\
+  & \\
+
+@mk-rule-name{E-AppSuperErr2}
+  & {
+      {
+        \left( @t{1}\ @v{3} \right) \to @v{4}
+        \qquad
+        \left( @t{2}\ @v{3} \right) \to \epsilon
+      }
+      \over
+      {
+        \left( \left( \sigma\ @t{1}\ @t{2} \right) @v{3} \right)
+        \to
+        @v{4}
+      }
+  } \\
+\end{array}
 }
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
