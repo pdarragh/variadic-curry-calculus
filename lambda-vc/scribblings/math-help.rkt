@@ -38,13 +38,13 @@
 
 (define (textsc text)
   (string-join
-   #:before-first "\\mathrm{"
+   #:before-first "{\\rm "
    (map
     (λ (text)
       (string-join
        (map (match-lambda [(cons sc? text)
                            (if sc?
-                               (format "\\small{~a}" (string-upcase text))
+                               (format "{\\small ~a}" (string-upcase text))
                                text)])
             (separate-text-by-pred
              text
@@ -56,11 +56,12 @@
   (λ ([sub #f])
     (let ([term-text (format "\\mathtt{\\mathbf{~a}}" term)])
       (if sub
-          (format "~a_~a" term-text sub)
+          (format "{~a}_{~a}" term-text sub)
           term-text))))
 
 (define t (mk-term "t"))
 (define v (mk-term "v"))
+(define x (mk-term "x"))
 
 (define (mk-rule-name name)
   (string-join
