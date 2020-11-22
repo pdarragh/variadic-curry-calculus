@@ -3,7 +3,9 @@
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-@require[@for-label[lambda-vc/base
+@require[@for-label[lambda-vc
+                    lambda-vc/base
+                    (prefix-in racket/base: racket/base)
                     racket/contract]]
 
 @title[#:tag "sec:api"]{λ@subscript{vc} API}
@@ -11,8 +13,12 @@
 
 @defmodule[lambda-vc]
 
-@defproc[(interp [exp any/c] [env (listof pair?)]) value?]{
-Function function function.
+@defproc[(interp [exp any/c] [env any/c]) value?]{
+not used by @racket[value?]
+}
+
+@defproc[(value? [exp any/c]) boolean?]{
+used by @racket[interp]
 }
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
