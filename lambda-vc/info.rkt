@@ -10,6 +10,6 @@
 (define scribblings '(("scribblings/lambda-vc.scrbl" (multi-page main-doc) (library))))
 
 (define deps '("base"
-               scribble-math))
+               "scribble-math"))
 (define build-deps '("scribble-lib"
                      "racket-doc"))
