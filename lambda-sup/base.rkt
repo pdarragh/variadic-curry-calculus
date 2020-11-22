@@ -1,7 +1,7 @@
 #lang racket
 ;; A modified lambda calculus with superpositions.
 
-(provide mt-env interp)
+(provide (all-defined-out))
 
 (struct param (name) #:transparent)
 (struct clo (formal body env) #:transparent)

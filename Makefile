@@ -1,7 +1,7 @@
 .DEFAULT_GOAL: default
 .PHONY: default install remove
 
-PACKAGE := varcur-calc
+PACKAGE := lambda-sup
 
 default: install
 
@@ -9,7 +9,7 @@ install:
 	raco pkg install --auto "$(PACKAGE)/"
 
 setup:
-	raco setup --pkgs varcur-calc
+	raco setup --pkgs "$(PACKAGE)"
 
 remove:
 	@raco pkg remove --auto $(PACKAGE) \
