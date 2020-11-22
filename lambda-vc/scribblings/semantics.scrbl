@@ -5,12 +5,17 @@
 
 @require[@for-label[lambda-vc
                     lambda-vc/base
-                    racket/contract]]
+                    racket/contract]
+         scribble-math
+         "math-help.rkt"]
+@(use-mathjax)
 
 @title[#:tag "sec:semantics"]{λ@subscript{vc} Semantics}
 @author[(@author+email "Pierce Darragh" "pierce.darragh@gmail.com")]
 
 Some stuff.
+
+@section{Syntax Rules}
 
 @tabular[#:sep @hspace[1]
 (list @; Terms Table Header
@@ -69,6 +74,20 @@ Some stuff.
             @tt{σ(t)}
             ""
             "superposition value"))]
+
+@section{Evaluation Rules}
+
+This is the operational semantics.
+
+@$${
+  {
+    @t{1} \to @t{1}'
+    \over
+    \left( @t{1}\ @t{2}^{\ast} \right) \to \left(@v{1}^{+}\ @t{2}'\ @t{3}^{\ast} \right)
+  }
+  \qquad
+  @mk-rule-name{E-App1}
+}
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
