@@ -6,7 +6,7 @@
 (struct param (name) #:transparent)
 (struct clo (formal body env) #:transparent)
 (struct clo-v clo () #:transparent)
-(struct supos (left right env) #:transparent)
+(struct supos (env terms) #:transparent)
 (struct clo-ffi (func) #:transparent)
 
 (define mt-env empty)
@@ -60,6 +60,11 @@
        [(cons formal formals)
         ;; auto-curried function
         (clo (param formal) `(λ ,formals ,body) env)])]
+    [`(,(or `σ `sigma) ,terms ...)
+     (displayln (format "σ -- terms: ~a" terms))
+     (let ([interp-terms (map (λ (t) (interp t env))
+                              terms)])
+       (supos env interp-terms))]
     [`(,func ,@(list arg args ..1))
      (let ([interp-func (interp func env)])
        (cond
@@ -105,11 +110,11 @@
                  [(clo-v? interp-func)
                   ;; application of a variadic function
                   (let ([formal (gensym "formal")])
-                    (supos interp-body (clo-v (param formal) (list interp-body formal) new-env) env))]  ;; TODO: check environment.
+                    (supos env (list interp-body (clo-v (param formal) (list interp-body formal)))))]  ;; TODO: check environment.
                  [else
                   ;; application of a normal function
                   interp-body]))])]
-         [(struct supos (s-t1 s-t2 s-env))
+         [(struct supos (s-env (list s-t1 s-t2)))
           ;; application of superposition
           (let* ([handler (λ (t) (with-handlers ([exn:fail:user? (λ (exn) 'error)])
                                    (interp t s-env)))]
@@ -121,7 +126,7 @@
               [(eq? 'error t2-result)
                t2-result]
               [else
-               (supos t1-result t2-result env)]))]
+               (supos env (list t1-result t2-result))]))]
          [_
           (raise-user-error 'interp (format "not a function: ~a" interp-func))]))]
     [_
