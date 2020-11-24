@@ -8,6 +8,7 @@
 (struct clo-v clo () #:transparent)
 (struct supos (env terms) #:transparent)
 (struct clo-ffi (func) #:transparent)
+(struct err (message) #:transparent)
 
 (define mt-env empty)
 (define (extend-env name value env)
@@ -43,7 +44,7 @@
   (match exp
     [(? symbol?)
      (or (env-lookup env exp)
-         `,exp)]  ;; NOTE: This could also be made to produce an error.
+         `,exp)]  ;; NOTE: This could also be made to produce an .
     [(? value?)
      exp]
     [`(,(or `λ `lambda) (,formals ...) ,body)
@@ -97,7 +98,7 @@
              (interp c-body c-env)]
             [_
              ;; non-nullary application of nullary function
-             (raise-user-error 'interp (format "cannot apply nullary function with argument(s): ~a" args))])]
+             (err (format "cannot apply nullary function with argument(s): ~a" args))])]
          [(struct clo ((struct param (c-param-name)) c-body c-env))
           ;; function is unary
           (match args
@@ -116,18 +117,18 @@
                   interp-body]))])]
          [(struct supos (s-env (list s-t1 s-t2)))
           ;; application of superposition
-          (let* ([handler (λ (t) (with-handlers ([exn:fail:user? (λ (exn) 'error)])
-                                   (interp t s-env)))]
-                 [t1-result (handler s-t1)]
-                 [t2-result (handler s-t2)])
-            (cond
-              [(eq? 'error t1-result)
-               t2-result]
-              [(eq? 'error t2-result)
+          (let ([t1-result (interp s-t1 s-env)]
+                [t2-result (interp s-t2 s-env)])
+            (match (cons t1-result t2-result)
+              [(cons (struct err _) (struct err _))
+               (err "erroneous superposition")]
+              [(cons t1-result (struct err _))
+               t1-result]
+              [(cons t2-result (struct err _))
                t2-result]
               [else
                (supos env (list t1-result t2-result))]))]
          [_
-          (raise-user-error 'interp (format "not a function: ~a" interp-func))]))]
+          (err (format "not a function: ~a" interp-func))]))]
     [_
-     (raise-user-error 'interp (format "invalid input: ~a" exp))]))
+     (err (format "invalid input: ~a" exp))]))
