@@ -46,7 +46,7 @@
          `,exp)]  ;; NOTE: This could also be made to produce an error.
     [(? value?)
      exp]
-    [(list (or 'λ 'lambda) (list formals ...) body)  ;; NOTE: Can be rewritten as: `(,(or `λ `lambda) (,formals ...) ,body)
+    [`(,(or `λ `lambda) (,formals ...) ,body)
      (match formals
        [(list)
         ;; nullary function
@@ -71,9 +71,9 @@
             (eval `(,(clo-ffi-func interp-func) ,interp-arg ,@interp-args)))]
          [else
           ;; multary application
-          (let ([interp-app (interp (list func arg) env)])
+          (let ([interp-app (interp `(,func ,arg) env)])
             (interp `(,interp-app ,@args) env))]))]
-    [(list func args ...)  ;; NOTE: Can be rewritten as: `(,func ,args ...)
+    [`(,func ,args ...)
      ;; nullary or unary application
      (let ([interp-func (interp func env)])
        (match interp-func
