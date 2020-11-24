@@ -4,7 +4,7 @@
 (provide (all-defined-out))
 
 (struct param (name) #:transparent)
-(struct clo (formal body env) #:transparent)
+(struct clo (env formal body) #:transparent)
 (struct clo-v clo () #:transparent)
 (struct supos (env terms) #:transparent)
 (struct clo-ffi (func) #:transparent)
@@ -51,16 +51,16 @@
      (match formals
        [(list)
         ;; nullary function
-        (clo #f body env)]
+        (clo env #f body)]
        [(list formal)
         ;; unary function
-        (clo (param formal) body env)]
+        (clo env (param formal) body)]
        [(list formal '...)
         ;; variadic function
         (clo-v (param formal) body env)]
        [(cons formal formals)
         ;; auto-curried function
-        (clo (param formal) `(λ ,formals ,body) env)])]
+        (clo env (param formal) `(λ ,formals ,body))])]
     [`(,(or `σ `sigma) ,terms ...)
      (displayln (format "σ -- terms: ~a" terms))
      (let ([interp-terms (map (λ (t) (interp t env))
@@ -90,7 +90,7 @@
             [(list arg)
              (let ([interp-arg (interp arg env)])
                (eval `(,ffi-func ,arg)))])]
-         [(struct clo (#f c-body c-env))
+         [(struct clo (c-env #f c-body))
           ;; function is nullary
           (match args
             [(list)
@@ -99,7 +99,7 @@
             [_
              ;; non-nullary application of nullary function
              (err (format "cannot apply nullary function with argument(s): ~a" args))])]
-         [(struct clo ((struct param (c-param-name)) c-body c-env))
+         [(struct clo (c-env (struct param (c-param-name)) c-body))
           ;; function is unary
           (match args
             [(list arg)
