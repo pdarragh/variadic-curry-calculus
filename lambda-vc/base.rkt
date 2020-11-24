@@ -111,7 +111,9 @@
                  [(clo-v? interp-func)
                   ;; application of a variadic function
                   (let ([formal (gensym "formal")])
-                    (supos env (list interp-body (clo-v (param formal) (list interp-body formal)))))]  ;; TODO: check environment.
+                    ;; TODO: Check that this environment is correct.
+                    ;; TODO: Revise function return value (it isn't correct).
+                    (supos env (list interp-body (clo-v (param formal) (list interp-body formal)))))]
                  [else
                   ;; application of a normal function
                   interp-body]))])]
