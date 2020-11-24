@@ -117,19 +117,21 @@
                  [else
                   ;; application of a normal function
                   interp-body]))])]
-         [(struct supos (s-env (list s-t1 s-t2)))
-          ;; application of superposition
-          (let ([t1-result (interp s-t1 s-env)]
-                [t2-result (interp s-t2 s-env)])
-            (match (cons t1-result t2-result)
-              [(cons (struct err _) (struct err _))
+         [(struct supos (s-env (list terms ...)))
+          (let* ([term-results (map (λ (term) (interp term s-env))
+                                    terms)]
+                 [filtered-term-results (filter (λ (result) (not (err? result)))
+                                                term-results)])
+            (match filtered-term-results
+              [(list)
+               ;; every branch resulted in an error
                (err "erroneous superposition")]
-              [(cons t1-result (struct err _))
-               t1-result]
-              [(cons t2-result (struct err _))
-               t2-result]
+              [(list term)
+               ;; there was exactly one result
+               term]
               [else
-               (supos env (list t1-result t2-result))]))]
+               ;; multiple branches did not result in errors
+               (supos env filtered-term-results)]))]
          [_
           (err (format "not a function: ~a" interp-func))]))]
     [_
