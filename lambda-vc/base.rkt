@@ -55,6 +55,8 @@
          `,exp)]  ;; NOTE: This could also be made to produce an error.
     [(? value?)
      exp]
+    [(? err?)
+     exp]
     [`(,(or `λ `lambda) (,formals ...) ,body)
      (match formals
        [(list)
@@ -124,104 +126,26 @@
                            ;; application of a normal function
                            interp-body))))]
             [(struct supos (last-result next-clo-v))
-             (let* ([interp-last-result-app `(,last-result ,@args)]
-                    [interp-next-clo-v-app `(,next-clo-v ,@args)]
-                    [filtered-results (filter (λ (r) (not (err? r)))
-                                              (list interp-last-result-app
-                                                    interp-next-clo-v-app))])
-               (match filtered-results
-                 [(list)
-                  ;; every branch resulted in an error
-                  (err "erronneous superposition")]
-                 [(list result)
+             ;; TODO: Check the environments used for interp sub-calls are correct.
+             (let ([interp-last-result-app (interp `(,last-result ,@args) env)]
+                   [interp-next-clo-v-app (interp `(,next-clo-v ,@args) env)])
+               (match (cons interp-last-result-app interp-next-clo-v-app)
+                 [(cons (? err?) (? err?))
+                  ;; both branches resulted in an error
+                  (err "erroneous superposition")]
+                 [(or (cons (? err?) result)
+                      (cons result (? err?)))
                   ;; there was exactly one result
                   result]
                  [else
-                  ;; TODO: check what kind of results we got.
-                  (err "UNIMPLEMENTED")]))]
+                  ;; Both results are valid, so we remain in a superposition.
+                  (supos interp-last-result-app
+                         interp-next-clo-v-app)]))]
             [(struct err (msg))
+             ;; pass the error along
              interp-func]
             [else
+             ;; encountered something we... did not expect
              (err (format "not a function: ~a" interp-func))])]))]
-    #;[`(,func ,@(list arg args ..1))
-     (let ([interp-func (interp func env)])
-       (cond
-         [(clo-ffi? interp-func)
-          ;; FFI application has to intercept the currying because Racket is not curried.
-          (let ([interp-arg (interp arg env)]
-                [interp-args (map (λ (arg) (interp arg env))
-                                  args)])
-            (eval `(,(clo-ffi-func interp-func) ,interp-arg ,@interp-args)))]
-         [else
-          ;; multary application
-          (let ([interp-app (interp `(,func ,arg) env)])
-            (interp `(,interp-app ,@args) env))]))]
-    #;[`(,func ,args ...)
-     ;; nullary or unary application
-     (let ([interp-func (interp func env)])
-       (match interp-func
-         [(struct clo-ffi (ffi-func))
-          (match args
-            [(list)
-             (eval `(,ffi-func))]
-            [(list arg)
-             (let ([interp-arg (interp arg env)])
-               (eval `(,ffi-func ,arg)))])]
-         [(struct clo (c-env #f c-body))
-          ;; function is nullary
-          (match args
-            [(list)
-             ;; nullary application
-             (interp c-body c-env)]
-            [_
-             ;; non-nullary application of nullary function
-             (err (format "cannot apply nullary function with argument(s): ~a" args))])]
-         [(struct clo (c-env (struct param (c-param-name)) c-body))
-          ;; function is unary
-          (match args
-            [(list arg)
-             ;; unary application
-             (let* ([interp-arg (interp arg env)]
-                    [new-env (extend-env c-param-name interp-arg c-env)]
-                    [interp-body (interp c-body new-env)])
-               (cond
-                 [(clo-v? interp-func)
-                  ;; application of a variadic function
-                  (let ([formal (gensym "formal")])
-                    ;; TODO: Check that this environment is correct.
-                    ;; TODO: Revise function return value (it isn't correct).
-                    (supos env (list interp-body (clo-v (param formal) (list interp-body formal)))))]
-                 [else
-                  ;; application of a normal function
-                  interp-body]))])]
-         ;; add2 = (λ (x ...) (+ 2 x))
-         ;;
-         ;; XXX
-         ;;  Okay, maybe I've got it.
-         ;;  - variadic functions must take two arguments
-         ;;  - use lists to store intermediate results
-         ;;  - keep the lists hidden from users (no need for lists in user-space)
-         ;;  - each application of the function replaces arg1 with the last value computed
-         ;;  - now variadic functions work like folds
-         ;;  - each value in the intermediate list is a valid "result" of the application
-         ;;  - application of superposition extracts both the last element of the list and applies the function
-         ;;
-         [(struct supos (s-env (list terms ...)))
-          (let* ([term-results (map (λ (term) (interp term s-env))
-                                    terms)]
-                 [filtered-term-results (filter (λ (result) (not (err? result)))
-                                                term-results)])
-            (match filtered-term-results
-              [(list)
-               ;; every branch resulted in an error
-               (err "erroneous superposition")]
-              [(list term)
-               ;; there was exactly one result
-               term]
-              [else
-               ;; multiple branches did not result in errors
-               (supos env filtered-term-results)]))]
-         [_
-          (err (format "not a function: ~a" interp-func))]))]
     [_
      (err (format "invalid input: ~a" exp))]))
