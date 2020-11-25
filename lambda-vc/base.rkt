@@ -6,7 +6,7 @@
 (struct param (name) #:transparent)
 (struct clo (env formal body) #:transparent)
 (struct clo-v clo () #:transparent)
-(struct supos (env terms) #:transparent)
+(struct supos (last-result next-clo-v) #:transparent)
 (struct clo-ffi (func) #:transparent)
 (struct err (message) #:transparent)
 
@@ -78,7 +78,67 @@
                ;; multary function; curry it!
                ;; NOTE: Should the lambda produced here be interpreted first?
                (clo env (param formal) `(λ ,formals ,body))]))])]
-    [`(,func ,@(list arg args ..1))
+    [`(,func ,args ...)
+     (let ([interp-func (interp func env)])
+       (cond
+         [(clo-ffi? interp-func)
+          ;; FFI application has to intercept the currying because Racket is not curried.
+          (let ([interp-args (map (λ (arg) (interp arg env))
+                                  args)])
+            (eval `(,(clo-ffi-func interp-func) ,@interp-args)))]
+         [(< 1 (length args))
+          ;; multary application
+          (let ([interp-first-app (interp `(,func ,(first args)) env)])
+            (interp `(,interp-first-app ,@(rest args)) env))]
+         [else
+          ;; nullary or unary application
+          (match interp-func
+            [(struct clo (c-env c-param c-body))
+             (if (eq? #f c-param)
+                 ;; function is nullary
+                 (if (not (empty? args))
+                     ;; non-nullary application of nullary function
+                     (err (format "cannot apply nullary function with argument(s): ~a" args))
+                     ;; nullary application
+                     (interp c-body c-env))
+                 ;; function is either unary or variadic
+                 (if (empty? args)
+                     ;; nullary application of non-nullary function
+                     (err "non-nullary function applied without arguments")
+                     ;; unary application
+                     (let* ([interp-arg (interp (first args) env)]
+                            [c-param-name (param-name c-param)]
+                            [new-env (extend-env c-param-name interp-arg c-env)]
+                            [interp-body (interp c-body new-env)]))
+                     (if (clo-v? interp-func)
+                         ;; application of a variadic function
+                         (match c-env
+                           ;; The environment of a variadic function is non-empty by construction.
+                           [`((,last-formal . ,last-val) ,old-env ...)
+                            ;; FIXME (λ (last-formal) (λ (v-formal ...) v-body))
+                            (supos interp-body
+                                   (clo-v (extend-env last-formal interp-body old-env)
+                                          c-param
+                                          c-body))])
+                         ;; application of a normal function
+                         interp-body)))]
+            [(struct supos (last-result next-clo-v))
+             (let* ([interp-last-result-app `(,last-result ,@args)]
+                    [interp-next-clo-v-app `(,next-clo-v ,@args)]
+                    [filtered-results (filter (λ (r) (not (err? r)))
+                                              (list interp-last-result-app
+                                                    interp-next-clo-v-app))])
+               (match filtered-results
+                 [(list)
+                  ;; every branch resulted in an error
+                  (err "erronneous superposition")]
+                 [(list result)
+                  ;; there was exactly one result
+                  resuult]
+                 [else
+                  ;; TODO: check what kind of results we got.
+                  (err "UNIMPLEMENTED")]))])]))]
+    #;[`(,func ,@(list arg args ..1))
      (let ([interp-func (interp func env)])
        (cond
          [(clo-ffi? interp-func)
@@ -91,7 +151,7 @@
           ;; multary application
           (let ([interp-app (interp `(,func ,arg) env)])
             (interp `(,interp-app ,@args) env))]))]
-    [`(,func ,args ...)
+    #;[`(,func ,args ...)
      ;; nullary or unary application
      (let ([interp-func (interp func env)])
        (match interp-func
@@ -129,6 +189,18 @@
                  [else
                   ;; application of a normal function
                   interp-body]))])]
+         ;; add2 = (λ (x ...) (+ 2 x))
+         ;;
+         ;; XXX
+         ;;  Okay, maybe I've got it.
+         ;;  - variadic functions must take two arguments
+         ;;  - use lists to store intermediate results
+         ;;  - keep the lists hidden from users (no need for lists in user-space)
+         ;;  - each application of the function replaces arg1 with the last value computed
+         ;;  - now variadic functions work like folds
+         ;;  - each value in the intermediate list is a valid "result" of the application
+         ;;  - application of superposition extracts both the last element of the list and applies the function
+         ;;
          [(struct supos (s-env (list terms ...)))
           (let* ([term-results (map (λ (term) (interp term s-env))
                                     terms)]
