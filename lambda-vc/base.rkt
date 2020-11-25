@@ -8,6 +8,11 @@
 
 (provide (all-defined-out))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Structs
+;;
+
 (struct param (name))
 (struct closure (env formal body)
   #:methods gen:custom-write
@@ -16,15 +21,15 @@
        [(closure _ #f c-body)
         (write-string (format "(λ () ~a)" c-body)
                       port)]
-       [(closure _ (param c-param-name) c-body)
-        (write-string (format "(λ (~a) ~a)" c-param-name c-body)
+       [(closure _ (param c-formal-name) c-body)
+        (write-string (format "(λ (~a) ~a)" c-formal-name c-body)
                       port)]))])
 (struct variadic-closure closure ()
   #:methods gen:custom-write
   [(define (write-proc vc port mode)
      (match vc
-       [(variadic-closure _ (param vc-param-name) vc-body)
-        (write-string (format "(λ (~a ...) ~a)" vc-param-name vc-body)
+       [(variadic-closure _ (param vc-formal-name) vc-body)
+        (write-string (format "(λ (~a ...) ~a)" vc-formal-name vc-body)
                       port)]))])
 (struct ffi-closure (func))
 (struct superposition (last-result next-variadic-closure)
@@ -35,6 +40,11 @@
         (write-string (format "(σ ~a ~a)" r c)
                       port)]))])
 (struct err (message) #:transparent)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Environments
+;;
 
 (define mt-env empty)
 (define (extend-env name value env)
@@ -60,6 +70,11 @@
           (cons '* (ffi-closure *))
           (cons '/ (ffi-closure /)))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Helpful Predicates
+;;
+
 (define (value? x)
   (or (integer? x)
       (closure? x)
@@ -72,6 +87,11 @@
 (define (formal? formal)
   (and (symbol? formal)
        (string-identifier? (symbol->string formal))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Interpreter
+;;
 
 (define (interp exp env)
   (match exp
@@ -135,8 +155,8 @@
                      (err "non-nullary function applied without arguments")
                      ;; unary application
                      (let* ([interp-arg (interp (first args) env)]
-                            [c-param-name (param-name c-param)]
-                            [new-env (extend-env c-param-name interp-arg c-env)]
+                            [c-formal-name (param-name c-param)]
+                            [new-env (extend-env c-formal-name interp-arg c-env)]
                             [interp-body (interp c-body new-env)])
                        (if (variadic-closure? interp-func)
                            ;; application of a variadic function
