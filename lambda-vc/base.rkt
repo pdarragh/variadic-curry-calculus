@@ -69,11 +69,12 @@
               [(list)
                ;; unary function
                (clo env (param formal) body)]
-              [(list formal '...)
-               ;; variadic function; check the environment is not empty
-               (if (env-empty? env)
+              [(list '...)
+               ;; variadic function; check the environment contains a user-bound variable
+               (if (or (env-empty? env)
+                       (clo-ffi? (cdar env)))
                    (err "variadic functions may only be defined within the body of another function")
-                   (clo-v (param formal) body env))]
+                   (clo-v env (param formal) body))]
               [else
                ;; multary function; curry it!
                ;; NOTE: Should the lambda produced here be interpreted first?
@@ -109,19 +110,19 @@
                      (let* ([interp-arg (interp (first args) env)]
                             [c-param-name (param-name c-param)]
                             [new-env (extend-env c-param-name interp-arg c-env)]
-                            [interp-body (interp c-body new-env)]))
-                     (if (clo-v? interp-func)
-                         ;; application of a variadic function
-                         (match c-env
-                           ;; The environment of a variadic function is non-empty by construction.
-                           [`((,last-formal . ,last-val) ,old-env ...)
-                            ;; FIXME (λ (last-formal) (λ (v-formal ...) v-body))
-                            (supos interp-body
-                                   (clo-v (extend-env last-formal interp-body old-env)
-                                          c-param
-                                          c-body))])
-                         ;; application of a normal function
-                         interp-body)))]
+                            [interp-body (interp c-body new-env)])
+                       (if (clo-v? interp-func)
+                           ;; application of a variadic function
+                           (match c-env
+                             ;; The environment of a variadic function is non-empty by construction.
+                             [`((,last-formal . ,last-val) ,old-env ...)
+                              ;; FIXME (λ (last-formal) (λ (v-formal ...) v-body))
+                              (supos interp-body
+                                     (clo-v (extend-env last-formal interp-body old-env)
+                                            c-param
+                                            c-body))])
+                           ;; application of a normal function
+                           interp-body))))]
             [(struct supos (last-result next-clo-v))
              (let* ([interp-last-result-app `(,last-result ,@args)]
                     [interp-next-clo-v-app `(,next-clo-v ,@args)]
@@ -134,10 +135,14 @@
                   (err "erronneous superposition")]
                  [(list result)
                   ;; there was exactly one result
-                  resuult]
+                  result]
                  [else
                   ;; TODO: check what kind of results we got.
-                  (err "UNIMPLEMENTED")]))])]))]
+                  (err "UNIMPLEMENTED")]))]
+            [(struct err (msg))
+             interp-func]
+            [else
+             (err (format "not a function: ~a" interp-func))])]))]
     #;[`(,func ,@(list arg args ..1))
      (let ([interp-func (interp func env)])
        (cond
