@@ -20,6 +20,7 @@
      (if (equal? name l-name)
          l-value
          (env-lookup rest-env name))]))
+(define env-empty? empty?)
 
 (define prelude
   (foldl (λ (pair env)
@@ -40,11 +41,18 @@
       (clo-ffi? x)
       (supos? x)))
 
+(define (string-identifier? s)
+  (regexp-match #rx"^[:alpha:](-[:word:])*$"))
+
+(define (formal? formal)
+  (and (symbol? formal)
+       (string-identifier? (symbol->string formal))))
+
 (define (interp exp env)
   (match exp
     [(? symbol?)
      (or (env-lookup env exp)
-         `,exp)]  ;; NOTE: This could also be made to produce an .
+         `,exp)]  ;; NOTE: This could also be made to produce an error.
     [(? value?)
      exp]
     [`(,(or `λ `lambda) (,formals ...) ,body)
@@ -52,20 +60,24 @@
        [(list)
         ;; nullary function
         (clo env #f body)]
-       [(list formal)
-        ;; unary function
-        (clo env (param formal) body)]
-       [(list formal '...)
-        ;; variadic function
-        (clo-v (param formal) body env)]
-       [(cons formal formals)
-        ;; auto-curried function
-        (clo env (param formal) `(λ ,formals ,body))])]
-    [`(,(or `σ `sigma) ,terms ...)
-     (displayln (format "σ -- terms: ~a" terms))
-     (let ([interp-terms (map (λ (t) (interp t env))
-                              terms)])
-       (supos env interp-terms))]
+       [(list formal formals ...)
+        ;; one or more formal parameters
+        ;; validate the first one
+        (if (not (formal? formal))
+            (err (format "invalid formal parameter name: ~a" formal))
+            (match formals
+              [(list)
+               ;; unary function
+               (clo env (param formal) body)]
+              [(list formal '...)
+               ;; variadic function; check the environment is not empty
+               (if (env-empty? env)
+                   (err "variadic functions may only be defined within the body of another function")
+                   (clo-v (param formal) body env))]
+              [else
+               ;; multary function; curry it!
+               ;; NOTE: Should the lambda produced here be interpreted first?
+               (clo env (param formal) `(λ ,formals ,body))]))])]
     [`(,func ,@(list arg args ..1))
      (let ([interp-func (interp func env)])
        (cond
