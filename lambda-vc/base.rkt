@@ -8,10 +8,10 @@
   #:methods gen:custom-write
   [(define (write-proc c port mode)
      (match c
-       [(struct clo (_ #f c-body))
+       [(clo _ #f c-body)
         (write-string (format "(λ () ~a)" c-body)
                       port)]
-       [(struct clo (_ (struct param (c-param-name)) c-body))
+       [(clo _ (param c-param-name) c-body)
         (write-string (format "(λ (~a) ~a)" c-param-name c-body)
                       port)]))])
 (struct clo-v clo ()
@@ -25,7 +25,7 @@
   #:methods gen:custom-write
   [(define (write-proc s port mode)
      (match s
-       [(struct supos (r c))
+       [(supos r c)
         (write-string (format "(σ ~a ~a)" r c)
                       port)]))])
 (struct clo-ffi (func))
@@ -117,7 +117,7 @@
          [else
           ;; nullary or unary application
           (match interp-func
-            [(struct clo (c-env c-param c-body))
+            [(clo c-env c-param c-body)
              (if (eq? #f c-param)
                  ;; function is nullary
                  (if (not (empty? args))
@@ -146,7 +146,7 @@
                                             c-body))])
                            ;; application of a normal function
                            interp-body))))]
-            [(struct supos (last-result next-clo-v))
+            [(supos last-result next-clo-v)
              ;; TODO: Check the environments used for interp sub-calls are correct.
              (let ([interp-last-result-app (interp `(,last-result ,@args) env)]
                    [interp-next-clo-v-app (interp `(,next-clo-v ,@args) env)])
@@ -162,7 +162,7 @@
                   ;; Both results are valid, so we remain in a superposition.
                   (supos interp-last-result-app
                          interp-next-clo-v-app)]))]
-            [(struct err (msg))
+            [(err msg)
              ;; pass the error along
              interp-func]
             [else
