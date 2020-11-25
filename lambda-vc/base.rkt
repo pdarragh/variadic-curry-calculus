@@ -81,12 +81,10 @@
       (ffi-closure? x)
       (superposition? x)))
 
-(define (string-identifier? s)
-  (regexp-match #px"^[[:alpha:]](-[[:word:]])*$" s))
-
 (define (formal? formal)
   (and (symbol? formal)
-       (string-identifier? (symbol->string formal))))
+       (regexp-match #px"^[[:alpha:]](-[[:word:]])*$"
+                     (symbol->string formal))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
