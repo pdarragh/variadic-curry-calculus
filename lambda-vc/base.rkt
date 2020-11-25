@@ -42,7 +42,7 @@
       (supos? x)))
 
 (define (string-identifier? s)
-  (regexp-match #rx"^[:alpha:](-[:word:])*$"))
+  (regexp-match #px"^[[:alpha:]](-[[:word:]])*$" s))
 
 (define (formal? formal)
   (and (symbol? formal)
