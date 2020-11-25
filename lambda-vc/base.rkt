@@ -1,34 +1,39 @@
 #lang racket
-;; A modified lambda calculus with superpositions.
+;; A modified lambda calculus with both automatic currying and variadic
+;; functions.
+;;
+;; This is made possible by the use of superpositions, where indeterminate
+;; results are considered non-deterministic and choices are delayed until later
+;; application of such a result.
 
 (provide (all-defined-out))
 
 (struct param (name))
-(struct clo (env formal body)
+(struct closure (env formal body)
   #:methods gen:custom-write
   [(define (write-proc c port mode)
      (match c
-       [(clo _ #f c-body)
+       [(closure _ #f c-body)
         (write-string (format "(λ () ~a)" c-body)
                       port)]
-       [(clo _ (param c-param-name) c-body)
+       [(closure _ (param c-param-name) c-body)
         (write-string (format "(λ (~a) ~a)" c-param-name c-body)
                       port)]))])
-(struct clo-v clo ()
+(struct variadic-closure closure ()
   #:methods gen:custom-write
-  [(define (write-proc c port mode)
-     (write-string (format "(λ (~a ...) ~a)"
-                           (param-name (clo-formal c))
-                           (clo-body c))
-                   port))])
-(struct supos (last-result next-clo-v)
+  [(define (write-proc vc port mode)
+     (match vc
+       [(variadic-closure _ (param vc-param-name) vc-body)
+        (write-string (format "(λ (~a ...) ~a)" vc-param-name vc-body)
+                      port)]))])
+(struct ffi-closure (func))
+(struct superposition (last-result next-variadic-closure)
   #:methods gen:custom-write
   [(define (write-proc s port mode)
      (match s
-       [(supos r c)
+       [(superposition r c)
         (write-string (format "(σ ~a ~a)" r c)
                       port)]))])
-(struct clo-ffi (func))
 (struct err (message) #:transparent)
 
 (define mt-env empty)
@@ -50,17 +55,16 @@
                        env))
          mt-env
          (list
-          (cons '+ (clo-ffi +))
-          (cons '- (clo-ffi -))
-          (cons '* (clo-ffi *))
-          (cons '/ (clo-ffi /)))))
+          (cons '+ (ffi-closure +))
+          (cons '- (ffi-closure -))
+          (cons '* (ffi-closure *))
+          (cons '/ (ffi-closure /)))))
 
 (define (value? x)
   (or (integer? x)
-      (clo? x)
-      (clo-v? x)
-      (clo-ffi? x)
-      (supos? x)))
+      (closure? x)
+      (ffi-closure? x)
+      (superposition? x)))
 
 (define (string-identifier? s)
   (regexp-match #px"^[[:alpha:]](-[[:word:]])*$" s))
@@ -82,7 +86,7 @@
      (match formals
        [(list)
         ;; nullary function
-        (clo env #f body)]
+        (closure env #f body)]
        [(list formal formals ...)
         ;; one or more formal parameters
         ;; validate the first one
@@ -91,25 +95,25 @@
             (match formals
               [(list)
                ;; unary function
-               (clo env (param formal) body)]
+               (closure env (param formal) body)]
               [(list '...)
                ;; variadic function; check the environment contains a user-bound variable
                (if (or (env-empty? env)
-                       (clo-ffi? (cdar env)))
+                       (ffi-closure? (cdar env)))
                    (err "variadic functions may only be defined within the body of another function")
-                   (clo-v env (param formal) body))]
+                   (variadic-closure env (param formal) body))]
               [else
                ;; multary function; curry it!
                ;; NOTE: Should the lambda produced here be interpreted first?
-               (clo env (param formal) `(λ ,formals ,body))]))])]
+               (closure env (param formal) `(λ ,formals ,body))]))])]
     [`(,func ,args ...)
      (let ([interp-func (interp func env)])
        (cond
-         [(clo-ffi? interp-func)
+         [(ffi-closure? interp-func)
           ;; FFI application has to intercept the currying because Racket is not curried.
           (let ([interp-args (map (λ (arg) (interp arg env))
                                   args)])
-            (eval `(,(clo-ffi-func interp-func) ,@interp-args)))]
+            (eval `(,(ffi-closure-func interp-func) ,@interp-args)))]
          [(< 1 (length args))
           ;; multary application
           (let ([interp-first-app (interp `(,func ,(first args)) env)])
@@ -117,7 +121,7 @@
          [else
           ;; nullary or unary application
           (match interp-func
-            [(clo c-env c-param c-body)
+            [(closure c-env c-param c-body)
              (if (eq? #f c-param)
                  ;; function is nullary
                  (if (not (empty? args))
@@ -134,23 +138,23 @@
                             [c-param-name (param-name c-param)]
                             [new-env (extend-env c-param-name interp-arg c-env)]
                             [interp-body (interp c-body new-env)])
-                       (if (clo-v? interp-func)
+                       (if (variadic-closure? interp-func)
                            ;; application of a variadic function
                            (match c-env
                              ;; The environment of a variadic function is non-empty by construction.
                              [`((,last-formal . ,last-val) ,old-env ...)
                               ;; FIXME (λ (last-formal) (λ (v-formal ...) v-body))
-                              (supos interp-body
-                                     (clo-v (extend-env last-formal interp-body old-env)
+                              (superposition interp-body
+                                     (variadic-closure (extend-env last-formal interp-body old-env)
                                             c-param
                                             c-body))])
                            ;; application of a normal function
                            interp-body))))]
-            [(supos last-result next-clo-v)
+            [(superposition last-result next-variadic-closure)
              ;; TODO: Check the environments used for interp sub-calls are correct.
              (let ([interp-last-result-app (interp `(,last-result ,@args) env)]
-                   [interp-next-clo-v-app (interp `(,next-clo-v ,@args) env)])
-               (match (cons interp-last-result-app interp-next-clo-v-app)
+                   [interp-next-variadic-closure-app (interp `(,next-variadic-closure ,@args) env)])
+               (match (cons interp-last-result-app interp-next-variadic-closure-app)
                  [(cons (? err?) (? err?))
                   ;; both branches resulted in an error
                   (err "erroneous superposition")]
@@ -160,8 +164,8 @@
                   result]
                  [else
                   ;; Both results are valid, so we remain in a superposition.
-                  (supos interp-last-result-app
-                         interp-next-clo-v-app)]))]
+                  (superposition interp-last-result-app
+                                 interp-next-variadic-closure-app)]))]
             [(err msg)
              ;; pass the error along
              interp-func]
