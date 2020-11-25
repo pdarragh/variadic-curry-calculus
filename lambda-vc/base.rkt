@@ -3,11 +3,32 @@
 
 (provide (all-defined-out))
 
-(struct param (name) #:transparent)
-(struct clo (env formal body) #:transparent)
-(struct clo-v clo () #:transparent)
-(struct supos (last-result next-clo-v) #:transparent)
-(struct clo-ffi (func) #:transparent)
+(struct param (name))
+(struct clo (env formal body)
+  #:methods gen:custom-write
+  [(define (write-proc c port mode)
+     (match c
+       [(struct clo (_ #f c-body))
+        (write-string (format "(λ () ~a)" c-body)
+                      port)]
+       [(struct clo (_ (struct param (c-param-name)) c-body))
+        (write-string (format "(λ (~a) ~a)" c-param-name c-body)
+                      port)]))])
+(struct clo-v clo ()
+  #:methods gen:custom-write
+  [(define (write-proc c port mode)
+     (write-string (format "(λ (~a ...) ~a)"
+                           (param-name (clo-formal c))
+                           (clo-body c))
+                   port))])
+(struct supos (last-result next-clo-v)
+  #:methods gen:custom-write
+  [(define (write-proc s port mode)
+     (match s
+       [(struct supos (r c))
+        (write-string (format "(σ ~a ~a)" r c)
+                      port)]))])
+(struct clo-ffi (func))
 (struct err (message) #:transparent)
 
 (define mt-env empty)
