@@ -83,6 +83,16 @@ This is the operational semantics.
 \tt
 \begin{array}{lc}
 
+@mk-rule-name{E-Substitute}
+  & {
+      {}
+      \over
+      @env[@x{1}]{@t{1}} @x{1}
+      @evaluates-to
+      @(env) @t{1}
+  } \\
+  & \\
+
 @mk-rule-name{E-App1}
   & {
       @t{1} \to @t{1}'
@@ -90,7 +100,7 @@ This is the operational semantics.
       {
         \left( @t{1}\ @t{2}^{\ast} \right)
         \to
-        \left(@v{1}^{+}\ @t{2}'\ @t{3}^{\ast} \right)
+        \left( @t{1}'\ @t{2}^{\ast} \right)
       }
   } \\
   & \\
@@ -109,17 +119,25 @@ This is the operational semantics.
 
 @mk-rule-name{E-AppNull}
   & {
-      \left( \left( \lambda \left(\ \right) @t{1} \right) \right)
-      \to
-      @t{1}
+      @t{1} \to @t{1}'
+      \over
+      {
+        \left( \left( \lambda \left(\ \right) @t{1} \right) \right)
+        \to
+        @t{1}'
+      }
   } \\
   & \\
 
 @mk-rule-name{E-AppUnary}
   & {
-      \left( \left( \lambda \left( @(x) \right) @t{1} \right) @v{2} \right)
+      {}
+      \over
+      \Gamma \vdash
+             \left( \left( \lambda \left( @x{1} \right) @t{1} \right) @v{2} \right)
       \to
-      @t{1}\left[@v{2} \middle/ @(x)\right]
+      \Gamma \left[ @x{1} \mapsto @v{2} \right] \vdash
+             @t{1}
   } \\
   & \\
 
@@ -148,7 +166,7 @@ This is the operational semantics.
       }
       \over
       {
-        \left( \left( \lambda \left( @(x)\ \ldots \right) @t{1} \right) @v{2} \right)
+        \Gamma \left[ @x{1} \mapsto @t{1} \right] \vdash \left( \left( \lambda \left( @(x)\ \ldots \right) @t{1} \right) @v{2} \right)
         \to
         \left( \sigma\ @t{12} \left( \lambda \left( @(x)\ \ldots \right) @t{12} \right) \right)
       }

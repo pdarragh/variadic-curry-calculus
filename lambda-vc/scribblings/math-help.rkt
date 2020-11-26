@@ -67,3 +67,12 @@
   (string-join
    (map textsc (string-split name "-"))
    (format "\\text{-}")))
+
+(define evaluates-to "\\ \\ \\longrightarrow \\ \\ ")
+(define (env [var #f] [val #f])
+  (format "\\Gamma ~a \\ \\vdash\\ "
+          (if (and var val)
+              (format "\\left[ ~a \\mapsto ~a \\right]"
+                      var
+                      val)
+              "")))
