@@ -101,12 +101,21 @@
 ;; Helpful Predicates
 ;;
 
+;; In this lambda calculus, we admit the following fundamental values:
+;;   - Integers.
+;;   - Closures (normal, variadic, and FFI).
+;;   - Superpositions.
 (define (value? x)
   (or (integer? x)
       (closure? x)
       (ffi-closure? x)
       (superposition? x)))
 
+;; User-defined functions must have formal parameter names that match the
+;; regular expression given below. Rendered in English, this correlates to names
+;; which begin with an alphabetical character and are then followed by zero or
+;; more hyphens or 'word' characters, which include the alphabetical characters,
+;; digits, and underscores.
 (define (formal? formal)
   (and (symbol? formal)
        (regexp-match #px"^[[:alpha:]](-[[:word:]])*$"
