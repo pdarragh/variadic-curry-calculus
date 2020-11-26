@@ -116,7 +116,7 @@
 ;; which begin with an alphabetical character and are then followed by zero or
 ;; more hyphens or 'word' characters, which include the alphabetical characters,
 ;; digits, and underscores.
-(define (formal? formal)
+(define (valid-formal? formal)
   (and (symbol? formal)
        (regexp-match #px"^[[:alpha:]](-[[:word:]])*$"
                      (symbol->string formal))))
@@ -128,102 +128,178 @@
 
 (define (interp exp env)
   (match exp
+    ;; Errors or values.
+    [(or (? err?)
+         (? value?))
+     ;; Return it as-is.
+     exp]
+    ;; Symbols.
     [(? symbol?)
+     ;; We attempt to look up symbols in the environment. If no binding exists,
+     ;; it's an error.
      (or (env-lookup env exp)
          (err (format "free variable: ~a" exp)))]
-    [(? value?)
-     exp]
-    [(? err?)
-     exp]
+    ;; Function declarations.
     [`(,(or `λ `lambda) (,formals ...) ,body)
+     ;; Function declarations are differentiated by the given formal parameters.
      (match formals
        [(list)
-        ;; nullary function
+        ;; A nullary (zero-argument) function.
         (closure env #f body)]
        [(list formal formals ...)
-        ;; one or more formal parameters
-        ;; validate the first one
-        (if (not (formal? formal))
+        ;; A 1+-argument function.
+        ;; We have to ensure the first parameter name given is valid.
+        (if (not (valid-formal? formal))
+            ;; If the formal parameter is invalid, produce an error.
             (err (format "invalid formal parameter name: ~a" formal))
+            ;; Otherwise, we look at the remaining formal parameters.
             (match formals
               [(list)
-               ;; unary function
+               ;; If there are no additional formal parameters, we have a
+               ;; unary (one-argument) function.
                (closure env (param formal) body)]
               [(list '...)
-               ;; variadic function; check the environment contains a user-bound variable
+               ;; Variadic functions are defined by supplying a single formal
+               ;; parameter with a trailing ellipsis.
+               ;;
+               ;; We only allow variadic functions to be defined within the
+               ;; body of another function, because the outer function's formal
+               ;; parameter will serve as the point at which to inject the
+               ;; superpositional return value in subsequent applications of
+               ;; the variadic function.
+               ;;
+               ;; TODO: At the moment, this check involves looking at the
+               ;;       environment to determine if it's either empty or has an
+               ;;       FFI function in the most-recently-bound position. This
+               ;;       is fragile, and an alternative encoding of environments
+               ;;       that separates the user's environment from the prelude
+               ;;       would be preferred.
                (if (or (env-empty? env)
                        (ffi-closure? (cdar env)))
+                   ;; The environment doesn't support a variadic function.
                    (err "variadic functions may only be defined within the body of another function")
+                   ;; We can build a variadic function, so do it!
                    (variadic-closure env (param formal) body))]
               [else
-               ;; multary function; curry it!
-               ;; NOTE: Should the lambda produced here be interpreted first?
+               ;; We have a non-empty list of additional formal parameters. Now
+               ;; we curry it!
+               ;;
+               ;; TODO: Should the lambda produced here be interpreted first?
                (closure env (param formal) `(λ ,formals ,body))]))])]
+    ;; Function and superposition applications.
     [`(,func ,args ...)
+     ;; Applications are determined by the shape of the term on the left.
      (let ([interp-func (interp func env)])
        (cond
+         ;; Foreign function applications
          [(ffi-closure? interp-func)
-          ;; FFI application has to intercept the currying because Racket is not curried.
+          ;; FFI application has to intercept the currying because Racket is not
+          ;; curried. I don't know of a way around this.
           (let ([interp-args (map (λ (arg) (interp arg env))
                                   args)])
+            ;; Call out to Racket using `eval`.
             (eval `(,(ffi-closure-func interp-func) ,@interp-args)))]
+         ;; Multary (application of 2 or more terms at once).
          [(< 1 (length args))
-          ;; multary application
+          ;; We rewrite the application as a staging of a single-argument
+          ;; application surrounded by a multary application.
           (let ([interp-first-app (interp `(,func ,(first args)) env)])
             (interp `(,interp-first-app ,@(rest args)) env))]
+         ;; Nullary or unary application.
          [else
-          ;; nullary or unary application
           (match interp-func
+            ;; Error application. (?)
+            [(err msg)
+             ;; Instead of creating a new error, let's just propagate this error
+             ;; back to the top.
+             interp-func]
+            ;; Function application.
             [(closure c-env c-param c-body)
              (if (eq? #f c-param)
-                 ;; function is nullary
+                 ;; The function is nullary, so we should not have arguments.
                  (if (not (empty? args))
-                     ;; non-nullary application of nullary function
+                     ;; Uh-oh; somebody applied the function to something!
                      (err (format "cannot apply nullary function with argument(s): ~a" args))
-                     ;; nullary application
+                     ;; This is okay.
                      (interp c-body c-env))
-                 ;; function is either unary or variadic
+                 ;; The function is either unary or variadic, both of which
+                 ;; require an argument to apply.
                  (if (empty? args)
-                     ;; nullary application of non-nullary function
+                     ;; No arguments were given!
                      (err "non-nullary function applied without arguments")
-                     ;; unary application
+                     ;; This is a successful application pathway.
+                     ;;
+                     ;; We now interpret the argument, substitute its value into
+                     ;; the environment, and then interpret the body of the
+                     ;; function in that environment.
                      (let* ([interp-arg (interp (first args) env)]
                             [c-formal-name (param-name c-param)]
                             [new-env (extend-env c-formal-name interp-arg c-env)]
                             [interp-body (interp c-body new-env)])
-                       (if (variadic-closure? interp-func)
-                           ;; application of a variadic function
+                       (if (not (variadic-closure? interp-func))
+                           ;; We're applying a normal function, so just return
+                           ;; the interpreted result.
+                           interp-body
+                           ;; If we're applying a variadic function, we need to
+                           ;; produce a superpositional result. This is because
+                           ;; we don't know whether this is the last argument
+                           ;; to apply to this function.
+                           ;;
+                           ;; To construct a subsequent variadic function to put
+                           ;; in the superposition, we retrieve the most-
+                           ;; recently-bound formal parameter name and construct
+                           ;; a new variadic function whose environment has this
+                           ;; name bound to the result of interpreting the body
+                           ;; that we just got back.
                            (match c-env
-                             ;; The environment of a variadic function is non-empty by construction.
+                             ;; The environment of a variadic function is
+                             ;; non-empty by construction, so destructure it.
                              [`((,last-formal . ,last-val) ,old-env ...)
-                              ;; FIXME (λ (last-formal) (λ (v-formal ...) v-body))
+                              ;; The result is a superposition of the
+                              ;; interpreted body (as though this application
+                              ;; were the last) and a new variadic function that
+                              ;; can be used to supply additional arguments to
+                              ;; the same computation.
                               (superposition interp-body
-                                     (variadic-closure (extend-env last-formal interp-body old-env)
-                                            c-param
-                                            c-body))])
-                           ;; application of a normal function
-                           interp-body))))]
+                                             (variadic-closure (extend-env last-formal interp-body old-env)
+                                                               c-param
+                                                               c-body))])))))]
+            ;; Superposition application.
             [(superposition last-result next-variadic-closure)
-             ;; TODO: Check the environments used for interp sub-calls are correct.
+             ;; We apply the arguments to both the result and the variadic
+             ;; function stored in the superposition (because we don't know
+             ;; which path is "correct").
              (let ([interp-last-result-app (interp `(,last-result ,@args) env)]
                    [interp-next-variadic-closure-app (interp `(,next-variadic-closure ,@args) env)])
                (match (cons interp-last-result-app interp-next-variadic-closure-app)
+                 ;; Both branches error...
                  [(cons (? err?) (? err?))
-                  ;; both branches resulted in an error
+                  ;; So we produce a new error.
                   (err "erroneous superposition")]
+                 ;; One branch succeeds...
                  [(or (cons (? err?) result)
                       (cons result (? err?)))
-                  ;; there was exactly one result
+                  ;; We return the successful result.
                   result]
+                 ;; Both branches succeed...
                  [else
-                  ;; Both results are valid, so we remain in a superposition.
+                  ;; We remain in a superposition.
+                  ;;
+                  ;; NOTE: We don't have to consider the implications of this
+                  ;;       too hard. If the variadic function succeeded (which
+                  ;;       it must have for us to be here), then the result of
+                  ;;       that application is itself a superposition. Now we
+                  ;;       have nested superpositions, which isn't phenomenal
+                  ;;       but it is easier than extracting the results and
+                  ;;       putting them into some kind of non-deterministic data
+                  ;;       structure (like a list).
                   (superposition interp-last-result-app
                                  interp-next-variadic-closure-app)]))]
-            [(err msg)
-             ;; pass the error along
-             interp-func]
+            ;; Application of something else?
             [else
-             ;; encountered something we... did not expect
+             ;; This is undefined by the semantics of lambda-vc.
              (err (format "not a function: ~a" interp-func))])]))]
+    ;; Some other form?
     [_
+     ;; No. Bad. Don't do this.
      (err (format "invalid input: ~a" exp))]))
