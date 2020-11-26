@@ -6,7 +6,7 @@
 ;; results are considered non-deterministic and choices are delayed until later
 ;; application of such a result.
 
-(provide (all-defined-out))
+(provide (rename-out [exposed-interp interp]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -126,6 +126,16 @@
 ;; Interpreter
 ;;
 
+;; The function we expose to the user only takes an expression as argument, and
+;; automatically interprets that expression in the context of the prelude. We
+;; also provide nicer error messages, because we're cool like that.
+(define (exposed-interp exp)
+  (let ([result (interp exp prelude)])
+    (if (err? result)
+        (displayln (format "ERROR: ~a" (err-message result)))
+        result)))
+
+;; This is the actual interpreter implementation.
 (define (interp exp env)
   (match exp
     ;; Errors or values.
