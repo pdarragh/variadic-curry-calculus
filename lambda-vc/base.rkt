@@ -13,7 +13,14 @@
 ;; Structs
 ;;
 
+;; Parameters are kept in a struct so we can distinguish nullary closures.
 (struct param (name))
+;; A closure is a tuple of:
+;;   - The active environment when the closure was formed.
+;;   - A formal parameter name.
+;;   - A body yet to be interpreted.
+;; The formal parameter can be omitted (creating a nullary function) by
+;; supplying a #f value.
 (struct closure (env formal body)
   #:methods gen:custom-write
   [(define (write-proc c port mode)
@@ -24,6 +31,8 @@
        [(closure _ (param c-formal-name) c-body)
         (write-string (format "(λ (~a) ~a)" c-formal-name c-body)
                       port)]))])
+;; Variadic closures are identical in composition to normal closures, but are
+;; handled differently by the interpreter and are printed differently.
 (struct variadic-closure closure ()
   #:methods gen:custom-write
   [(define (write-proc vc port mode)
@@ -31,7 +40,11 @@
        [(variadic-closure _ (param vc-formal-name) vc-body)
         (write-string (format "(λ (~a ...) ~a)" vc-formal-name vc-body)
                       port)]))])
+;; Foreign Function Interface closures are not actually closures, but are
+;; instead references to existing Racket functions.
 (struct ffi-closure (func))
+;; Superpositions encode two simultaneously valid values. These are used for
+;; handling the semantics of variadic functions in an auto-curried world.
 (struct superposition (last-result next-variadic-closure)
   #:methods gen:custom-write
   [(define (write-proc s port mode)
@@ -39,6 +52,8 @@
        [(superposition r c)
         (write-string (format "(σ ~a ~a)" r c)
                       port)]))])
+;; Error messages are handled in a struct so superposition collapsing can avoid
+;; installing error handlers.
 (struct err (message) #:transparent)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
