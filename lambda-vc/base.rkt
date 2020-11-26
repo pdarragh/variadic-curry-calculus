@@ -130,7 +130,7 @@
   (match exp
     [(? symbol?)
      (or (env-lookup env exp)
-         `,exp)]  ;; NOTE: This could also be made to produce an error.
+         (err (format "free variable: ~a" exp)))]
     [(? value?)
      exp]
     [(? err?)
