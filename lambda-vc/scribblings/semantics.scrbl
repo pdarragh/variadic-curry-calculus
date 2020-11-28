@@ -79,148 +79,156 @@ Some stuff.
 
 This is the operational semantics.
 
-@$${
-\tt
-\begin{array}{lc}
+@tabular[#:sep @hspace[1] #:column-properties '(left center)
+(list
+  (list @$$rule-name{E-Substitute}
+        @$${
+          @empty
+          \over
+          @env{@x{1} -> @t{1}} @x{1}
+          @evaluates-to
+          @env{} @t{1}
+        })
+  (list @$$rule-name{E-Curry}
+        @$${
+          @empty
+          \over
+          @func{@x{1} @space @x{2}^{+} . @t{1}}
+          @evaluates-to
+          @func{@x{1} . @func{@x{2}^{+} . @t{1}}}
+        })
+  (list @$$rule-name{E-AppReduce}
+        @$${
+          @t{1} @evaluates-to @t{1}'
+          \over
+          {
+            @group{@t{1} @space @t{2}^{\ast}}
+            @evaluates-to
+            @group{@t{1}' @space @t{2}^{\ast}}
+          }
+        })
+  (list @$$rule-name{E-AppNull}
+        @$${
+          @t{1} @evaluates-to @t{1}'
+          \over
+          {
+            @group{@func{@space . @t{1}}}
+            @evaluates-to
+            @t{1}'
+          }
+        })
+  (list @$$rule-name{E-AppUnary}
+        @$${
+          @env{@x{1} -> @t{2}} @t{1}
+          @evaluates-to
+          @t{1}'
+          \over
+          @(env) @group{@func{@x{1} . @t{1}} @space @t{2}}
+          @evaluates-to
+          @t{1}'
+        })
+  (list @$$rule-name{E-AppUncurry}
+        @$${
+          @empty
+          \over
+          {
+            @group{@v{1} @space @t{2} @space @t{3}^{+}}
+            @evaluates-to
+            @group{@group{@v{1} @space @t{2}} @space @t{3}^{+}}
+          }
+        })
+  (list @$$rule-name{E-AppVariadic}
+        @$${
+          {
+            @group{@t{1} @space @v{2}}
+            @evaluates-to
+            @t{12}
+          }
+          \over
+          {
+            @env{@x{1} -> @t{1}} @group{@func{@x{1} @space @ellipsis . @t{1}} @space @v{2}}
+            @evaluates-to
+            @sup{@t{12} | @func{@x{1} @space @ellipsis . @t{12}}}
+          }
+        })
+  (list @$$rule-name{E-AppSuper}
+        @$${
+          {
+            @t{3}
+            @evaluates-to
+            @t{3}'
 
-@mk-rule-name{E-Substitute}
-  & {
-      {}
-      \over
-      @env[@x{1}]{@t{1}} @x{1}
-      @evaluates-to
-      @(env) @t{1}
-  } \\
-  & \\
+            \qquad
 
-@mk-rule-name{E-App1}
-  & {
-      @t{1} \to @t{1}'
-      \over
-      {
-        \left( @t{1}\ @t{2}^{\ast} \right)
-        \to
-        \left( @t{1}'\ @t{2}^{\ast} \right)
-      }
-  } \\
-  & \\
+            @group{@t{1} @space @t{3}'}
+            @evaluates-to
+            @t{13}
 
-@mk-rule-name{E-App2}
-  & {
-      @t{2} \to @t{2}'
-      \over
-      {
-        \left( @v{1}^{+}\ @t{2}\ @t{3}^{\ast} \right)
-        \to
-        \left( @v{1}^{+}\ @t{2}'\ @t{3}^{\ast} \right)
-      }
-  } \\
-  & \\
+            \qquad
 
-@mk-rule-name{E-AppNull}
-  & {
-      @t{1} \to @t{1}'
-      \over
-      {
-        \left( \left( \lambda \left(\ \right) @t{1} \right) \right)
-        \to
-        @t{1}'
-      }
-  } \\
-  & \\
+            @group{@t{2} @space @t{3}'}
+            @evaluates-to
+            @t{23}
+          }
+          \over
+          {
+            @group{@sup{@t{1} | @t{2}} @space @t{3}}
+            @evaluates-to
+            @sup{@t{13} | @t{23}}
+          }
+        })
+  (list @$$rule-name{E-AppSuperErr1}
+        @$${
+          {
+            @t{3}
+            @evaluates-to
+            @t{3}'
 
-@mk-rule-name{E-AppUnary}
-  & {
-      {}
-      \over
-      \Gamma \vdash
-             \left( \left( \lambda \left( @x{1} \right) @t{1} \right) @v{2} \right)
-      \to
-      \Gamma \left[ @x{1} \mapsto @v{2} \right] \vdash
-             @t{1}
-  } \\
-  & \\
+            \qquad
 
-@mk-rule-name{E-AppUncurry}
-  & {
-      {
-        \left( @v{1}\ @v{2} \right)
-        \to
-        @t{12}
-      }
-      \over
-      {
-        \left( @v{1}\ @v{2}\ @v{3}^{+} \right)
-        \to
-        \left( @t{12}\ @v{3}^{+} \right)
-      }
-  } \\
-  & \\
+            @group{@t{1} @space @t{3}'}
+            @evaluates-to
+            @err
 
-@mk-rule-name{E-AppVariadic}
-  & {
-      {
-        \left( @t{1}\ @v{2} \right)
-        \to
-        @t{12}
-      }
-      \over
-      {
-        \Gamma \left[ @x{1} \mapsto @t{1} \right] \vdash \left( \left( \lambda \left( @(x)\ \ldots \right) @t{1} \right) @v{2} \right)
-        \to
-        \left( \sigma\ @t{12} \left( \lambda \left( @(x)\ \ldots \right) @t{12} \right) \right)
-      }
-  } \\
-  & \\
+            \qquad
 
-@mk-rule-name{E-AppSuper}
-  & {
-      {
-        \left( @t{1}\ @v{3} \right) \to @v{4}
-        \qquad
-        \left( @t{2}\ @v{3} \right) \to @v{5}
-      }
-      \over
-      {
-        \left( \left( \sigma\ @t{1}\ @t{2} \right) @v{3} \right)
-        \to
-        \left( \sigma\ @v{4}\ @v{5} \right)
-      }
-  } \\
-  & \\
+            @group{@t{2} @space @t{3}'}
+            @evaluates-to
+            @t{23}
+          }
+          \over
+          {
+            @group{@sup{@t{1} | @t{2}} @space @t{3}}
+            @evaluates-to
+            @t{23}
+          }
+        })
+  (list @$$rule-name{E-AppSuperErr2}
+        @$${
+          {
+            @t{3}
+            @evaluates-to
+            @t{3}'
 
-@mk-rule-name{E-AppSuperErr1}
-  & {
-      {
-        \left( @t{1}\ @v{3} \right) \to \epsilon
-        \qquad
-        \left( @t{2}\ @v{3} \right) \to @v{4}
-      }
-      \over
-      {
-        \left( \left( \sigma\ @t{1}\ @t{2} \right) @v{3} \right)
-        \to
-        @v{4}
-      }
-  } \\
-  & \\
+            \qquad
 
-@mk-rule-name{E-AppSuperErr2}
-  & {
-      {
-        \left( @t{1}\ @v{3} \right) \to @v{4}
-        \qquad
-        \left( @t{2}\ @v{3} \right) \to \epsilon
-      }
-      \over
-      {
-        \left( \left( \sigma\ @t{1}\ @t{2} \right) @v{3} \right)
-        \to
-        @v{4}
-      }
-  } \\
-\end{array}
-}
+            @group{@t{1} @space @t{3}'}
+            @evaluates-to
+            @t{13}
+
+            \qquad
+
+            @group{@t{2} @space @t{3}'}
+            @evaluates-to
+            @err
+          }
+          \over
+          {
+            @group{@sup{@t{1} | @t{2}} @space @t{3}}
+            @evaluates-to
+            @t{13}
+          }
+        }))]
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

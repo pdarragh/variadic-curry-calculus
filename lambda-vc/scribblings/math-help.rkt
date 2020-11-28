@@ -1,6 +1,10 @@
 #lang racket
 
+(require scribble-math)
+
 (provide (all-defined-out))
+
+(use-mathjax)
 
 (define (separate-text-by-pred text pred)
   (define (group->text-pair group group-matches-pred?)
@@ -63,16 +67,57 @@
 (define v (mk-term "v"))
 (define x (mk-term "x"))
 
-(define (mk-rule-name name)
-  (string-join
-   (map textsc (string-split name "-"))
-   (format "\\text{-}")))
+(define ($$rule-name name)
+  ($$ (string-join
+       (map textsc (string-split name "-"))
+       (format "\\text{-}"))))
 
-(define evaluates-to "\\ \\ \\longrightarrow \\ \\ ")
-(define (env [var #f] [val #f])
-  (format "\\Gamma ~a \\ \\vdash\\ "
-          (if (and var val)
-              (format "\\left[ ~a \\mapsto ~a \\right]"
-                      var
-                      val)
-              "")))
+(define (split-on lst sep)
+  (define (split-on sep acc rem)
+    (match rem
+      [(list)
+       (values acc '())]
+      [(list next rest-rem ...)
+       (if (equal? next sep)
+           (values acc rest-rem)
+           (split-on sep (cons next acc) rest-rem))]))
+  (let-values ([(acc rem) (split-on sep '() lst)])
+    (values (reverse acc) rem)))
+
+(define g-epsilon "\\epsilon")
+(define g-lambda "\\lambda")
+(define g-sigma "\\sigma")
+(define g-Gamma "\\Gamma")
+(define empty "{}")
+(define space "{\\ }")
+(define ellipsis "\\ldots")
+(define err g-epsilon)
+(define evaluates-to
+  (string-append space space "\\longrightarrow" space space))
+(define lpar "\\left(")
+(define rpar "\\right)")
+(define (env . args)
+  (string-append
+   g-Gamma
+   (format "~a" (if (null? args)
+                    ""
+                    (string-append
+                     "\\left["
+                     (string-replace
+                      (string-replace (string-join args "") "->" "\\mapsto")
+                      "," (string-append "," space))
+                     "\\right]")))
+   space "\\vdash" space))
+(define (group . args)
+  (string-join
+   #:before-first lpar
+   args
+   #:after-last rpar))
+(define (func . args)
+  (match (string-split (string-join args "") ".")
+    [(list var body)
+     (group g-lambda space (group var) space body)]))
+(define (sup . args)
+  (match (string-split (string-join args "") "|")
+    [(list var body)
+     (group g-sigma space var space body)]))
