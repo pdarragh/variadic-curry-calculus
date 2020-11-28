@@ -84,6 +84,7 @@
   (let-values ([(acc rem) (split-on sep '() lst)])
     (values (reverse acc) rem)))
 
+(define at "@")
 (define g-epsilon "\\epsilon")
 (define g-lambda "\\lambda")
 (define g-sigma "\\sigma")
@@ -94,6 +95,8 @@
 (define err g-epsilon)
 (define evaluates-to
   (string-append space "\\longrightarrow" space))
+(define evaluates-to*
+  (string-append space "\\longrightarrow^{\\ast}" space))
 (define lpar "\\left(")
 (define rpar "\\right)")
 (define (env . args)

@@ -83,9 +83,9 @@ This is the operational semantics.
 (list
   (list @$$rule-name{E-Substitute}
         @$$judgment[
-          @env{@x{1} -> @t{2}} @x{1}
+          @env{@x{1} -> @v{2}} @x{1}
           @evaluates-to
-          @env{} @t{2}
+          @env{} @v{2}
         ])
   (list @$$rule-name{E-Curry}
         @$$judgment[
@@ -93,7 +93,13 @@ This is the operational semantics.
           @evaluates-to
           @func{@x{1} . @func{@x{2}^{+} . @t{3}}}
         ])
-  (list @$$rule-name{E-AppReduce}
+  (list @$$rule-name{E-AppUncurry}
+        @$$judgment[
+          @parens{@t{1} @space @t{2} @space @t{3}^{+}}
+          @evaluates-to
+          @parens{@parens{@t{1} @space @t{2}} @space @t{3}^{+}}
+        ])
+  (list @$$rule-name{E-AppReduce1}
         @$$judgment[
           #:premise @group{
                       @t{1}
@@ -101,9 +107,21 @@ This is the operational semantics.
                       @t{1}'
           }
           #:conclusion @group{
-                        @parens{@t{1} @space @t{2}^{\ast}}
+                        @parens{@t{1} @space @t{2}}
                         @evaluates-to
-                        @parens{@t{1}' @space @t{2}^{\ast}}
+                        @parens{@t{1}' @space @t{2}}
+          }])
+  (list @$$rule-name{E-AppReduce2}
+        @$$judgment[
+          #:premise @group{
+                      @t{2}
+                      @evaluates-to
+                      @t{2}'
+          }
+          #:conclusion @group{
+                        @parens{@v{1} @space @t{2}}
+                        @evaluates-to
+                        @parens{@v{1} @space @t{2}'}
           }])
   (list @$$rule-name{E-AppNull}
         @$$judgment[
@@ -117,108 +135,77 @@ This is the operational semantics.
                         @evaluates-to
                         @t{1}'
           }])
-  (list @$$rule-name{E-AppUnary1}
+  (list @$$rule-name{E-AppUnary}
         @$$judgment[
-          #:premise @group{
-                      @t{3}
-                      @evaluates-to
-                      @t{3}'
-          }
-          #:conclusion @group{
-                        @parens{@func{@x{1} . @t{2}} @space @t{3}}
-                        @evaluates-to
-                        @parens{@func{@x{1} . @t{2}} @space @t{3}'}
-          }])
-  (list @$$rule-name{E-AppUnary2}
-        @$$judgment[
-          #:premise @group{
-                      @env{@x{1} -> @v{3}} @t{2}
-                      @evaluates-to
-                      @t{2}'
-          }
-          #:conclusion @group{
-                        @(env) @parens{@func{@x{1} . @t{2}} @space @v{3}}
-                        @evaluates-to
-                        @t{2}'
-          }])
-  (list @$$rule-name{E-AppUncurry}
-        @$$judgment[
-          @parens{@v{1} @space @t{2} @space @t{3}^{+}}
+          @parens{@func{@x{1} . @t{2}} @space @v{3}}
           @evaluates-to
-          @parens{@parens{@v{1} @space @t{2}} @space @t{3}^{+}}
+          @env{@x{1} -> @v{3}} @t{2}
         ])
   (list @$$rule-name{E-AppVariadic}
         @$$judgment[
           #:premise @group{
-                      @parens{@t{1} @space @v{2}}
-                      @evaluates-to
-                      @t{12}
+                      @env{@x{1} -> @v{2}, @x{3} -> @v{5}} @t{4}
+                      @evaluates-to*
+                      @v{6}
           }
-          #:conclusion @group{
-                        @env{@x{1} -> @t{1}} @parens{@func{@x{1} @space @ellipsis . @t{1}} @space @v{2}}
+          #:conclusion @group{\small
+                        @env{@x{1} -> @v{2}} @parens{@func{@x{3} @space @ellipsis . @t{4}} @space @v{5}}
                         @evaluates-to
-                        @sup{@t{12} | @func{@x{1} @space @ellipsis . @t{12}}}
+                        @env{@x{1} -> @v{6}} @sup{@v{6} | @func{@x{3} @space @ellipsis . @t{4}}}
           }])
-  (list @$$rule-name{E-AppSuper}
+  (list @$$rule-name{E-AppSuperposition}
         @$$judgment[
           #:premises (list
                       @group{
-                        @t{3}
-                        @evaluates-to
-                        @t{3}'}
-                      @group{
-                        @parens{@t{1} @space @t{3}'}
+                        @parens{@v{1} @space @v{3}}
                         @evaluates-to
                         @t{13}}
                       @group{
-                        @parens{@t{2} @space @t{3}'}
+                        @parens{@v{2} @space @v{3}}
                         @evaluates-to
                         @t{23}})
           #:conclusion @group{
-                        @parens{@sup{@t{1} | @t{2}} @space @t{3}}
+                        @parens{@sup{@v{1} | @v{2}} @space @v{3}}
                         @evaluates-to
                         @sup{@t{13} | @t{23}}
           }])
-  (list @$$rule-name{E-AppSuperErr1}
+  (list @$$rule-name{E-SuperpositionReduce1}
         @$$judgment[
-          #:premises (list
-                      @group{
-                        @t{3}
-                        @evaluates-to
-                        @t{3}'}
-                      @group{
-                        @parens{@t{1} @space @t{3}'}
-                        @evaluates-to
-                        @err}
-                      @group{
-                        @parens{@t{2} @space @t{3}'}
-                        @evaluates-to
-                        @t{23}})
+          #:premise @group{
+                      @t{1}
+                      @evaluates-to
+                      @t{1}'
+          }
           #:conclusion @group{
-                        @parens{@sup{@t{1} | @t{2}} @space @t{3}}
+                        @sup{@t{1} | @t{2}}
                         @evaluates-to
-                        @t{23}
+                        @sup{@t{1}' | @t{2}}
           }])
-  (list @$$rule-name{E-AppSuperErr2}
+  (list @$$rule-name{E-SuperpositionReduce2}
         @$$judgment[
-          #:premises (list
-                      @group{
-                        @t{3}
-                        @evaluates-to
-                        @t{3}'}
-                      @group{
-                        @parens{@t{1} @space @t{3}'}
-                        @evaluates-to
-                        @t{13}}
-                      @group{
-                        @parens{@t{2} @space @t{3}'}
-                        @evaluates-to
-                        @err})
+          #:premise @group{
+                      @t{2}
+                      @evaluates-to
+                      @t{2}'
+          }
           #:conclusion @group{
-                        @parens{@sup{@t{1} | @t{2}} @space @t{3}}
+                        @sup{@v{1} | @t{2}}
                         @evaluates-to
-                        @t{13}
-          }]))]
+                        @sup{@v{1} | @t{2}'}
+          }])
+  (list @$$rule-name{E-SuperpositionReduce3}
+        @$$judgment[
+          @sup{@g-epsilon | @t{2}}
+          @evaluates-to
+          @t{2}
+        ])
+  (list @$$rule-name{E-SuperpositionReduce4}
+        @$$judgment[
+          @sup{@t{1} | @g-epsilon}
+          @evaluates-to
+          @t{1}
+        ])
+)]
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
