@@ -3,10 +3,7 @@
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-@require[@for-label[lambda-vc
-                    lambda-vc/base
-                    racket/contract]
-         scribble-math
+@require[scribble-math
          "math-help.rkt"]
 @(use-mathjax)
 

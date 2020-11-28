@@ -1,8 +1,8 @@
 #lang racket
 
-(require "base.rkt")
+(require "lambda-vc.rkt")
 
-(provide (all-from-out "base.rkt"))
+(provide (all-from-out "lambda-vc.rkt"))
 
 (module reader syntax/module-reader
   varcur-calc)
