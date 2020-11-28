@@ -1,22 +1,51 @@
+# This Makefile mostly copy/pasted from:
+#   http://www.greghendershott.com/2014/06/does-your-racket-project-need-a-makefile.html
+
+PACKAGENAME=lambda-vc
+COLLECTS=lambda-vc
+SCRBL=lambda-vc/scribblings/lambda-vc.scrbl
+
 .DEFAULT_GOAL: default
-.PHONY: default install remove
+.PHONY: default clean setup link unlink htmldocs pages publish
 
-PACKAGE := lambda-vc
+default: setup
 
-default: install
-
-install:
-	raco pkg install --auto "$(PACKAGE)/"
+clean:
+	find . -name compiled -type d | xargs rm -rf
+	rm -rf htmldocs
 
 setup:
-	raco setup --pkgs "$(PACKAGE)"
+	raco setup $(COLLECTS)
 
-remove:
-	@raco pkg remove --auto $(PACKAGE) \
-	  || (echo "\nConsider removing the dependent packages listed above by doing:" \
-	           "\n    raco pkg remove --auto <package>" \
-	           "\nYou can also force the removal to proceed by doing:" \
-	           "\n    raco pkg remove --force $(PACKAGE)" \
-	           "\nbut this is not recommended.\n" \
-	           1>&2 ; \
-	      exit 1)
+link:
+	raco pkg install --link -n $(PACKAGENAME) $$(pwd)
+
+unlink:
+	raco pkg remove $(PACKAGENAME)
+
+htmldocs: $(SCRBL)
+	raco scribble \
+		--html \
+		--dest htmldocs \
+		--dest-name index \
+		++main-xref-in \
+		--redirect-main http://docs.racket-lang.org/ \
+		\
+		$(SCRBL)
+
+pages:
+	@(git branch -v | grep -q gh-pages || (echo local gh-pages branch missing; false))
+	@echo
+	@git branch -av | grep gh-pages
+	@echo
+	@(echo 'Is the branch up to date? Press enter to continue.'; read dummy)
+	git clone -b gh-pages . pages
+
+publish: htmldocs pages
+	rm -rf pages/*
+	cp -r htmldocs/. pages/.
+	(cd pages; git add -A)
+	-(cd pages; git commit -m "Update $$(date +%Y%m%d%H%M%S)")
+	(cd pages; git push origin gh-pages)
+	rm -rf pages
+	git push origin gh-pages
