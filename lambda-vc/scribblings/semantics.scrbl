@@ -38,7 +38,7 @@ Some stuff.
             ""
             "variadic function")
       (list ""
-            @tt{σ(t)}
+            @tt{(σ t t)}
             ""
             "superposition")
       (list ""
@@ -55,10 +55,6 @@ Some stuff.
             ""
             "integer value")
       (list ""
-            @tt{x}
-            ""
-            "variable value")
-      (list ""
             @tt{(λ () t)}
             ""
             "nullary function value")
@@ -71,13 +67,36 @@ Some stuff.
             ""
             "variadic function value")
       (list ""
-            @tt{σ(t)}
+            @tt{(σ v v)}
             ""
             "superposition value"))]
 
 @section{Evaluation Rules}
 
-This is the operational semantics.
+These are the operational semantics of λ@subscript{vc}.
+The @${@single-step-arrow} indicates an evaluation that can be taken in a
+single step.
+The @${@many-step-arrow*} indicates an evaluation whose result can be reached
+in zero or more steps.
+(I have tried to reduce the use of @${@many-step-arrow*} as much as possible to
+provide a small-step semantics, but this was tricky for variadic functions.)
+
+The @${@err} indicates an error value.
+Although I did not specifically label them, any invalid evaluation step will
+produce an error value @${@err}.
+In almost all cases, these will short-circuit the reference interpreter to be
+returned to the user.
+The notable exception to this behavior is when an error value is obtained as
+the result of evaluating one arm of a superposition, in which case the
+superposition collapses and only the other arm remains.
+(If both arms produce errors, then an error is returned.)
+
+@${@g-lambda} and @${@g-sigma} are syntactic literals.
+@${@(t)} represents terms, @${@(x)} represents variables, and @${@(v)}
+represents values, as per the definitions given in the preceding section.
+Subscripts are used on @${@(t)}, @${@(x)}, and @${@(v)} to disambiguate
+specific instances, and these subscripts are numbered from left to right in
+order of appearance in the conclusion of each judgment rule as a convention.
 
 @tabular[#:sep @hspace[1]
 (list
@@ -195,13 +214,13 @@ This is the operational semantics.
           }])
   (list @$$rule-name{E-SuperpositionReduce3}
         @$$judgment[
-          @sup{@g-epsilon | @t{2}}
+          @sup{@err | @t{2}}
           @evaluates-to
           @t{2}
         ])
   (list @$$rule-name{E-SuperpositionReduce4}
         @$$judgment[
-          @sup{@t{1} | @g-epsilon}
+          @sup{@t{1} | @err}
           @evaluates-to
           @t{1}
         ])

@@ -93,10 +93,12 @@
 (define big-space "{\\qquad}")
 (define ellipsis "\\ldots")
 (define err g-epsilon)
+(define single-step-arrow "\\longrightarrow")
+(define many-step-arrow* "\\longrightarrow^{\\ast}")
 (define evaluates-to
-  (string-append space "\\longrightarrow" space))
+  (string-append space single-step-arrow space))
 (define evaluates-to*
-  (string-append space "\\longrightarrow^{\\ast}" space))
+  (string-append space many-step-arrow* space))
 (define lpar "\\left(")
 (define rpar "\\right)")
 (define (env . args)
