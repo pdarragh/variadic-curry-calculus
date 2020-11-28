@@ -102,9 +102,9 @@ This is the operational semantics.
           @t{1} @evaluates-to @t{1}'
           \over
           {
-            @group{@t{1} @space @t{2}^{\ast}}
+            @parens{@t{1} @space @t{2}^{\ast}}
             @evaluates-to
-            @group{@t{1}' @space @t{2}^{\ast}}
+            @parens{@t{1}' @space @t{2}^{\ast}}
           }
         })
   (list @$$rule-name{E-AppNull}
@@ -112,7 +112,7 @@ This is the operational semantics.
           @t{1} @evaluates-to @t{1}'
           \over
           {
-            @group{@func{@space . @t{1}}}
+            @parens{@func{@space . @t{1}}}
             @evaluates-to
             @t{1}'
           }
@@ -123,7 +123,7 @@ This is the operational semantics.
           @evaluates-to
           @t{1}'
           \over
-          @(env) @group{@func{@x{1} . @t{1}} @space @t{2}}
+          @(env) @parens{@func{@x{1} . @t{1}} @space @t{2}}
           @evaluates-to
           @t{1}'
         })
@@ -132,21 +132,21 @@ This is the operational semantics.
           @empty
           \over
           {
-            @group{@v{1} @space @t{2} @space @t{3}^{+}}
+            @parens{@v{1} @space @t{2} @space @t{3}^{+}}
             @evaluates-to
-            @group{@group{@v{1} @space @t{2}} @space @t{3}^{+}}
+            @parens{@parens{@v{1} @space @t{2}} @space @t{3}^{+}}
           }
         })
   (list @$$rule-name{E-AppVariadic}
         @$${
           {
-            @group{@t{1} @space @v{2}}
+            @parens{@t{1} @space @v{2}}
             @evaluates-to
             @t{12}
           }
           \over
           {
-            @env{@x{1} -> @t{1}} @group{@func{@x{1} @space @ellipsis . @t{1}} @space @v{2}}
+            @env{@x{1} -> @t{1}} @parens{@func{@x{1} @space @ellipsis . @t{1}} @space @v{2}}
             @evaluates-to
             @sup{@t{12} | @func{@x{1} @space @ellipsis . @t{12}}}
           }
@@ -160,19 +160,19 @@ This is the operational semantics.
 
             \qquad
 
-            @group{@t{1} @space @t{3}'}
+            @parens{@t{1} @space @t{3}'}
             @evaluates-to
             @t{13}
 
             \qquad
 
-            @group{@t{2} @space @t{3}'}
+            @parens{@t{2} @space @t{3}'}
             @evaluates-to
             @t{23}
           }
           \over
           {
-            @group{@sup{@t{1} | @t{2}} @space @t{3}}
+            @parens{@sup{@t{1} | @t{2}} @space @t{3}}
             @evaluates-to
             @sup{@t{13} | @t{23}}
           }
@@ -186,19 +186,19 @@ This is the operational semantics.
 
             \qquad
 
-            @group{@t{1} @space @t{3}'}
+            @parens{@t{1} @space @t{3}'}
             @evaluates-to
             @err
 
             \qquad
 
-            @group{@t{2} @space @t{3}'}
+            @parens{@t{2} @space @t{3}'}
             @evaluates-to
             @t{23}
           }
           \over
           {
-            @group{@sup{@t{1} | @t{2}} @space @t{3}}
+            @parens{@sup{@t{1} | @t{2}} @space @t{3}}
             @evaluates-to
             @t{23}
           }
@@ -212,19 +212,19 @@ This is the operational semantics.
 
             \qquad
 
-            @group{@t{1} @space @t{3}'}
+            @parens{@t{1} @space @t{3}'}
             @evaluates-to
             @t{13}
 
             \qquad
 
-            @group{@t{2} @space @t{3}'}
+            @parens{@t{2} @space @t{3}'}
             @evaluates-to
             @err
           }
           \over
           {
-            @group{@sup{@t{1} | @t{2}} @space @t{3}}
+            @parens{@sup{@t{1} | @t{2}} @space @t{3}}
             @evaluates-to
             @t{13}
           }

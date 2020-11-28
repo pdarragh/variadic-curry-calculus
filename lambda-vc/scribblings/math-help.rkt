@@ -108,7 +108,7 @@
                       "," (string-append "," space))
                      "\\right]")))
    space "\\vdash" space))
-(define (group . args)
+(define (parens . args)
   (string-join
    #:before-first lpar
    args
@@ -116,8 +116,8 @@
 (define (func . args)
   (match (string-split (string-join args "") ".")
     [(list var body)
-     (group g-lambda space (group var) space body)]))
+     (parens g-lambda space (parens var) space body)]))
 (define (sup . args)
   (match (string-split (string-join args "") "|")
     [(list var body)
-     (group g-sigma space var space body)]))
+     (parens g-sigma space var space body)]))
