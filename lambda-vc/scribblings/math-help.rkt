@@ -88,12 +88,12 @@
 (define g-lambda "\\lambda")
 (define g-sigma "\\sigma")
 (define g-Gamma "\\Gamma")
-(define empty "{}")
 (define space "{\\ }")
+(define big-space "{\\qquad}")
 (define ellipsis "\\ldots")
 (define err g-epsilon)
 (define evaluates-to
-  (string-append space space "\\longrightarrow" space space))
+  (string-append space "\\longrightarrow" space))
 (define lpar "\\left(")
 (define rpar "\\right)")
 (define (env . args)
@@ -108,6 +108,12 @@
                       "," (string-append "," space))
                      "\\right]")))
    space "\\vdash" space))
+(define (group . args)
+  (string-join
+   #:before-first "{"
+   args
+   #:after-last "}"))
+(define empty (group))
 (define (parens . args)
   (string-join
    #:before-first lpar
@@ -121,3 +127,18 @@
   (match (string-split (string-join args "") "|")
     [(list var body)
      (parens g-sigma space var space body)]))
+
+(define ($$judgment
+         #:premise [premise #f]
+         #:premises [premises (list)]
+         #:conclusion [conclusion #f] . rest-conclusion)
+  (let ([premises (add-between (map group (if premise
+                                              (cons premise premises)
+                                              premises))
+                               big-space)]
+        [conclusion (if conclusion
+                        (cons conclusion rest-conclusion)
+                        rest-conclusion)])
+    ($$ (format "~a \\over ~a"
+                (apply group premises)
+                (apply group conclusion)))))
