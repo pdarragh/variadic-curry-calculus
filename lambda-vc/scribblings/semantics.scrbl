@@ -79,19 +79,19 @@ Some stuff.
 
 This is the operational semantics.
 
-@tabular[#:sep @hspace[1] #:column-properties '(left center)
+@tabular[#:sep @hspace[1]
 (list
   (list @$$rule-name{E-Substitute}
         @$$judgment[
-          @env{@x{1} -> @t{1}} @x{1}
+          @env{@x{1} -> @t{2}} @x{1}
           @evaluates-to
-          @env{} @t{1}
+          @env{} @t{2}
         ])
   (list @$$rule-name{E-Curry}
         @$$judgment[
-          @func{@x{1} @space @x{2}^{+} . @t{1}}
+          @func{@x{1} @space @x{2}^{+} . @t{3}}
           @evaluates-to
-          @func{@x{1} . @func{@x{2}^{+} . @t{1}}}
+          @func{@x{1} . @func{@x{2}^{+} . @t{3}}}
         ])
   (list @$$rule-name{E-AppReduce}
         @$$judgment[
@@ -117,17 +117,29 @@ This is the operational semantics.
                         @evaluates-to
                         @t{1}'
           }])
-  (list @$$rule-name{E-AppUnary}
+  (list @$$rule-name{E-AppUnary1}
         @$$judgment[
           #:premise @group{
-                      @env{@x{1} -> @t{2}} @t{1}
+                      @t{3}
                       @evaluates-to
-                      @t{1}'
+                      @t{3}'
           }
           #:conclusion @group{
-                        @(env) @parens{@func{@x{1} . @t{1}} @space @t{2}}
+                        @parens{@func{@x{1} . @t{2}} @space @t{3}}
                         @evaluates-to
-                        @t{1}'
+                        @parens{@func{@x{1} . @t{2}} @space @t{3}'}
+          }])
+  (list @$$rule-name{E-AppUnary2}
+        @$$judgment[
+          #:premise @group{
+                      @env{@x{1} -> @v{3}} @t{2}
+                      @evaluates-to
+                      @t{2}'
+          }
+          #:conclusion @group{
+                        @(env) @parens{@func{@x{1} . @t{2}} @space @v{3}}
+                        @evaluates-to
+                        @t{2}'
           }])
   (list @$$rule-name{E-AppUncurry}
         @$$judgment[
