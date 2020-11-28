@@ -51,8 +51,9 @@ This is an implementation of a small, untyped lambda calculus with support for
 both automated currying and variadic functions.
 @;
 @table-of-contents[]
-@include-section["api.scrbl"]
+@include-section["syntax.scrbl"]
 @include-section["semantics.scrbl"]
+@include-section["using-interpreter.scrbl"]
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

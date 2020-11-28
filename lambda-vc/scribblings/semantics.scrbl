@@ -10,68 +10,7 @@
          "math-help.rkt"]
 @(use-mathjax)
 
-@title[#:tag "sec:semantics"]{λ@subscript{vc} Semantics}
-@author[(@author+email "Pierce Darragh" "pierce.darragh@gmail.com")]
-
-Some stuff.
-
-@section{Syntax Rules}
-
-@tabular[#:sep @hspace[1]
-(list @; Terms Table Header
-      (list @bold{t ::=} "" @bold{terms:} 'cont)
-      @; Rows
-      (list ""
-            @tt{z}
-            ""
-            "integer")
-      (list ""
-            @tt{x}
-            ""
-            "variable")
-      (list ""
-            @tt{(λ (x@superscript{*}) t)}
-            ""
-            "n-ary function")
-      (list ""
-            @tt{(λ (x@superscript{+} ...) t)}
-            ""
-            "variadic function")
-      (list ""
-            @tt{(σ t t)}
-            ""
-            "superposition")
-      (list ""
-            @tt{(t@superscript{+})}
-            ""
-            "application")
-      @; Spacing
-      (list "" "" "" "")
-      @; Values Table Header
-      (list @bold{v ::=} "" @bold{values:} 'cont)
-      @; Rows
-      (list ""
-            @tt{z}
-            ""
-            "integer value")
-      (list ""
-            @tt{(λ () t)}
-            ""
-            "nullary function value")
-      (list ""
-            @tt{(λ (x) t)}
-            ""
-            "unary function value")
-      (list ""
-            @tt{(λ (x ...) t)}
-            ""
-            "variadic function value")
-      (list ""
-            @tt{(σ v v)}
-            ""
-            "superposition value"))]
-
-@section{Evaluation Rules}
+@title[#:tag "sec:semantics"]{Semantics}
 
 These are the operational semantics of λ@subscript{vc}.
 The @${@single-step-arrow} indicates an evaluation that can be taken in a
@@ -91,7 +30,8 @@ the result of evaluating one arm of a superposition, in which case the
 superposition collapses and only the other arm remains.
 (If both arms produce errors, then an error is returned.)
 
-@${@g-lambda} and @${@g-sigma} are syntactic literals.
+@${@g-lambda}, @${@g-sigma}, @${@ellipsis}, and @${@(parens)} are syntactic
+literals.
 @${@(t)} represents terms, @${@(x)} represents variables, and @${@(v)}
 represents values, as per the definitions given in the preceding section.
 Subscripts are used on @${@(t)}, @${@(x)}, and @${@(v)} to disambiguate
