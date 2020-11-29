@@ -36,3 +36,6 @@ TAGS
 
 # coredumps
 *.core
+
+# Project-specific.
+htmldocs
