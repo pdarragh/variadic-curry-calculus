@@ -15,7 +15,7 @@ tweet} asking:
 @nested[#:style 'inset]{@italic{If you had a Lisp with auto-currying what would
 you expect as the application of ((- 1) 2)?}}
 
-Traditionally, the lisp arithmetic functions are variadic.
+Traditionally, the Lisp arithmetic functions are variadic.
 This means they can be given any number of arguments and compute a result:
 
 @codeblock|{
