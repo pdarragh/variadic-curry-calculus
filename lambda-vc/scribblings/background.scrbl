@@ -62,9 +62,10 @@ In λ@subscript{vc}, the superposition encodes two states@note{
   superposition of more than two states is possible by nesting.
 } that are considered "equally likely" (in that no probability is assigned).
 Observation occurs through application.
-When a superposition is applied to a value, the value is applied to both the
-result of the variadic function that begat the superposition as well as the
-variadic function itself as though it were waiting for an additional argument.
+When a superposition is applied to a value, application distributes across both
+branches of the superposition: the result of the variadic function that begat
+the superposition as well as the variadic function itself as though it were
+waiting for an additional argument.
 
 To make this work, variadic functions @italic{must} be declared within the
 context of another non-nullary function.
@@ -74,9 +75,8 @@ However, we also construct a new version of the variadic function with an
 updated environment.
 In this environment, the value bound during application of the parent function
 is replaced with the result of the variadic application.
-
-This is an implementation of a small, untyped lambda calculus with support for
-both automated currying and variadic functions.
+This is kept around in the variadic closure for subsequent applications (if
+any).
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
