@@ -17,9 +17,9 @@ The code lives on GitHub at
 @;
 @table-of-contents[]
 @include-section["background.scrbl"]
+@include-section["using-interpreter.scrbl"]
 @include-section["syntax.scrbl"]
 @include-section["semantics.scrbl"]
-@include-section["using-interpreter.scrbl"]
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
