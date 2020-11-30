@@ -79,6 +79,13 @@ order of appearance in the conclusion of each judgment rule as a convention.
                         @evaluates-to
                         @parens{@v{1} @space @t{2}'}
           }])
+  (list @$$rule-name{E-AppReduce3}
+        @$$judgment[
+          #:conclusion @group{
+                        @parens{@v{1} @space @sup{@v{2} | @v{3}}}
+                        @evaluates-to
+                        @sup{@parens{@v{1} @space @v{2}} | @parens{@v{1} @space @v{3}}}
+          }])
   (list @$$rule-name{E-AppNull}
         @$$judgment[
           #:premise @group{
