@@ -279,8 +279,16 @@
              ;; We apply the arguments to both the result and the variadic
              ;; function stored in the superposition (because we don't know
              ;; which path is "correct").
-             (let ([interp-last-result-app (interp `(,last-result ,@args) env)]
-                   [interp-next-variadic-closure-app (interp `(,next-variadic-closure ,@args) env)])
+             ;;
+             ;; While performing these interpretations, capture any errors so
+             ;; the superposition can properly collapse as needed.
+             (define (intercept-errors-interp body)
+               (with-handlers ([(λ (e) #t)
+                                (λ (e)
+                                  (err "failure during superposition sub-interpretation"))])
+                 (interp body env)))
+             (let ([interp-last-result-app (intercept-errors-interp `(,last-result ,@args))]
+                   [interp-next-variadic-closure-app (intercept-errors-interp `(,next-variadic-closure ,@args))])
                (match (cons interp-last-result-app interp-next-variadic-closure-app)
                  ;; Both branches error...
                  [(cons (? err?) (? err?))
