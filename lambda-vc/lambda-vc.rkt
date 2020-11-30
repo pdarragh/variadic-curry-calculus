@@ -98,7 +98,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Helpful Predicates
+;; Helpful Functions
 ;;
 
 ;; In this lambda calculus, we admit the following fundamental values:
@@ -121,6 +121,19 @@
        (regexp-match #px"^[[:alpha:]](-[[:word:]])*$"
                      (symbol->string formal))))
 
+;; Like findf, but instead of only returning the found item (or #f) this version
+;; returns the item and the index at which it was found (or #f if not found).
+(define (findf+index proc lst)
+  (define (findf+index lst index)
+    (match lst
+      [(list)
+       #f]
+      [(list item rest-lst ...)
+       (if (proc item)
+           (cons item index)
+           (findf+index rest-lst (add1 index)))]))
+  (findf+index lst 0))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Interpreter
@@ -138,6 +151,22 @@
 ;; This is the actual interpreter implementation.
 (define (interp exp env)
   (match exp
+    ;; Superpositions must be checked first.
+    [(superposition l-val r-val)
+     ;; Interpretation of a superposition looks to see if either branch can be
+     ;; collapsed to produce a single (non-superpositional) value.
+     (match (cons l-val r-val)
+       ;; Did both branches produce errors?
+       [(cons (? err?) (? err?))
+        ;; Yes, so we produce a new error.
+        (err "erroneous superposition")]
+       ;; Did either branch succeed?
+       [(or (cons (? err?) result)
+            (cons result (? err?)))
+        ;; Return the successful result.
+        result]
+       ;; Otherwise, both branches succeed, so we remain in a superposition.
+       [else exp])]
     ;; Errors or values.
     [(or (? err?)
          (? value?))
@@ -165,8 +194,8 @@
             ;; Otherwise, we look at the remaining formal parameters.
             (match formals
               [(list)
-               ;; If there are no additional formal parameters, we have a
-               ;; unary (one-argument) function.
+               ;; If there are no additional formal parameters, we have a unary
+               ;; (one-argument) function.
                (closure env (param formal) body)]
               [(list '...)
                ;; Variadic functions are defined by supplying a single formal
@@ -198,17 +227,56 @@
                (closure env (param formal) `(λ ,formals ,body))]))])]
     ;; Function and superposition applications.
     [`(,func ,args ...)
+     (define (intercept-errors-interp body)
+       (with-handlers ([(λ (e) #t)
+                        (λ (e)
+                          (err "failure during superposition sub-interpretation"))])
+         (interp body env)))
      ;; Applications are determined by the shape of the term on the left.
      (let ([interp-func (interp func env)])
        (cond
-         ;; Foreign function applications
+         ;; Foreign function application.
          [(ffi-closure? interp-func)
           ;; FFI application has to intercept the currying because Racket is not
           ;; curried. I don't know of a way around this.
-          (let ([interp-args (map (λ (arg) (interp arg env))
-                                  args)])
-            ;; Call out to Racket using `apply`.
-            (apply (ffi-closure-func interp-func) interp-args))]
+          ;;
+          ;; Unfortunately, this makes handling application to superpositions
+          ;; tricky because we now need to peek through the entire list to find
+          ;; if any argument is a superposition whose interpretation should be
+          ;; forked. We do this by interpreting the arguments in-order and
+          ;; simply stopping when we come to the first superposition, relying on
+          ;; recursive calls to handle the subsequent arguments as needed.
+          ;;
+          ;; This involves some needless recursive calls, but these will mostly
+          ;; resolve quickly since the arguments we keep re-interpreting should
+          ;; be fundamental values after the first pass over the argument list.
+          (let* ([interp-args (map (λ (arg) (interp arg env))
+                                   args)]
+                 [first-superposition (findf+index superposition? interp-args)])
+            (if first-superposition
+                ;; We have a superposition, so interpretation must fork.
+                (match (car first-superposition)
+                  [(superposition last-result next-variadic-closure)
+                   (let*-values ([(good-args other-args) (split-at
+                                                          interp-args
+                                                          (cdr first-superposition))]
+                                 [(interp-arg-func) (λ (arg)
+                                                      (intercept-errors-interp
+                                                       `(,interp-func
+                                                         ,@good-args
+                                                         ,(interp arg env)
+                                                         ,@(rest other-args))))]
+                                 ;; Interp the first value.
+                                 [(interp-last-result-app) (interp-arg-func last-result)]
+                                 ;; Now interp the second value.
+                                 [(interp-next-variadic-closure-app) (interp-arg-func next-variadic-closure)])
+                     ;; We push both interpretation results into the
+                     ;; superposition.
+                     (interp (superposition interp-last-result-app
+                                            interp-next-variadic-closure-app)
+                             env))])
+                ;; There is no superposition in the arguments, so make the call.
+                (apply (ffi-closure-func interp-func) interp-args)))]
          ;; Multary (application of 2 or more terms at once).
          [(< 1 (length args))
           ;; We rewrite the application as a staging of a single-argument
@@ -239,41 +307,55 @@
                      (err "non-nullary function applied without arguments")
                      ;; This is a successful application pathway.
                      ;;
-                     ;; We now interpret the argument, substitute its value into
-                     ;; the environment, and then interpret the body of the
-                     ;; function in that environment.
-                     (let* ([interp-arg (interp (first args) env)]
-                            [c-formal-name (param-name c-param)]
-                            [new-env (extend-env c-formal-name interp-arg c-env)]
-                            [interp-body (interp c-body new-env)])
-                       (if (not (variadic-closure? interp-func))
-                           ;; We're applying a normal function, so just return
-                           ;; the interpreted result.
-                           interp-body
-                           ;; If we're applying a variadic function, we need to
-                           ;; produce a superpositional result. This is because
-                           ;; we don't know whether this is the last argument
-                           ;; to apply to this function.
-                           ;;
-                           ;; To construct a subsequent variadic function to put
-                           ;; in the superposition, we retrieve the most-
-                           ;; recently-bound formal parameter name and construct
-                           ;; a new variadic function whose environment has this
-                           ;; name bound to the result of interpreting the body
-                           ;; that we just got back.
-                           (match c-env
-                             ;; The environment of a variadic function is
-                             ;; non-empty by construction, so destructure it.
-                             [`((,last-formal . ,last-val) ,old-env ...)
-                              ;; The result is a superposition of the
-                              ;; interpreted body (as though this application
-                              ;; were the last) and a new variadic function that
-                              ;; can be used to supply additional arguments to
-                              ;; the same computation.
-                              (superposition interp-body
-                                             (variadic-closure (extend-env last-formal interp-body old-env)
-                                                               c-param
-                                                               c-body))])))))]
+                     ;; We now interpret the argument. If it is a superposition,
+                     ;; we fork interpretation and merge later. This allows us
+                     ;; to avoid exposing any observational literals into the
+                     ;; language while still keeping superpositions useful in
+                     ;; many situations.
+                     (let ([interp-arg (interp (first args) env)])
+                       (match interp-arg
+                         [(superposition last-result next-variadic-closure)
+                          ;; With a superposition, we fork interpretation and
+                          ;; recurse (to clean up error branches).
+                          (interp (superposition (interp `(,interp-func ,last-result) env)
+                                                 (interp `(,interp-func ,next-variadic-closure) env))
+                                  env)]
+                         [else
+                          ;; Just a normal argument for application.
+                          (let* ([c-formal-name (param-name c-param)]
+                                 [new-env (extend-env c-formal-name interp-arg c-env)]
+                                 [interp-body (interp c-body new-env)])
+                            (if (not (variadic-closure? interp-func))
+                                ;; We're applying a normal function, so just
+                                ;; return the interpreted result.
+                                interp-body
+                                ;; If we're applying a variadic function, we
+                                ;; need to produce a superpositional result.
+                                ;; This is because we don't know whether this is
+                                ;; the last argument to apply to this function.
+                                ;;
+                                ;; To construct a subsequent variadic function
+                                ;; to put in the superposition, we retrieve the
+                                ;; most-recently-bound formal parameter name and
+                                ;; construct a new variadic function whose
+                                ;; environment has this name bound to the result
+                                ;; of interpreting the body that we just got
+                                ;; back.
+                                (match c-env
+                                  ;; The environment of a variadic function is
+                                  ;; non-empty by construction, so destructure.
+                                  [`((,last-formal . ,last-val) ,old-env ...)
+                                   ;; The result is a superposition of the
+                                   ;; interpreted body (as though this
+                                   ;; application were the last) and a new
+                                   ;; variadic function that can be used to
+                                   ;; supply additional arguments to the same
+                                   ;; computation.
+                                   (interp (superposition interp-body
+                                                          (variadic-closure (extend-env last-formal interp-body old-env)
+                                                                            c-param
+                                                                            c-body))
+                                           env)])))]))))]
             ;; Superposition application.
             [(superposition last-result next-variadic-closure)
              ;; We apply the arguments to both the result and the variadic
@@ -282,37 +364,13 @@
              ;;
              ;; While performing these interpretations, capture any errors so
              ;; the superposition can properly collapse as needed.
-             (define (intercept-errors-interp body)
-               (with-handlers ([(λ (e) #t)
-                                (λ (e)
-                                  (err "failure during superposition sub-interpretation"))])
-                 (interp body env)))
              (let ([interp-last-result-app (intercept-errors-interp `(,last-result ,@args))]
                    [interp-next-variadic-closure-app (intercept-errors-interp `(,next-variadic-closure ,@args))])
-               (match (cons interp-last-result-app interp-next-variadic-closure-app)
-                 ;; Both branches error...
-                 [(cons (? err?) (? err?))
-                  ;; So we produce a new error.
-                  (err "erroneous superposition")]
-                 ;; One branch succeeds...
-                 [(or (cons (? err?) result)
-                      (cons result (? err?)))
-                  ;; We return the successful result.
-                  result]
-                 ;; Both branches succeed...
-                 [else
-                  ;; We remain in a superposition.
-                  ;;
-                  ;; NOTE: We don't have to consider the implications of this
-                  ;;       too hard. If the variadic function succeeded (which
-                  ;;       it must have for us to be here), then the result of
-                  ;;       that application is itself a superposition. Now we
-                  ;;       have nested superpositions, which isn't phenomenal
-                  ;;       but it is easier than extracting the results and
-                  ;;       putting them into some kind of non-deterministic data
-                  ;;       structure (like a list).
-                  (superposition interp-last-result-app
-                                 interp-next-variadic-closure-app)]))]
+               ;; We immediately interp on the constructed superposition. This
+               ;; will collapse any error branches.
+               (interp (superposition interp-last-result-app
+                                      interp-next-variadic-closure-app)
+                       env))]
             ;; Application of something else?
             [else
              ;; This is undefined by the semantics of lambda-vc.
