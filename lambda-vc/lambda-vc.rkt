@@ -207,8 +207,8 @@
           ;; curried. I don't know of a way around this.
           (let ([interp-args (map (λ (arg) (interp arg env))
                                   args)])
-            ;; Call out to Racket using `eval`.
-            (eval `(,(ffi-closure-func interp-func) ,@interp-args)))]
+            ;; Call out to Racket using `apply`.
+            (apply (ffi-closure-func interp-func) interp-args))]
          ;; Multary (application of 2 or more terms at once).
          [(< 1 (length args))
           ;; We rewrite the application as a staging of a single-argument
