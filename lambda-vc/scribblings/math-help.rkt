@@ -6,6 +6,9 @@
 
 (use-mathjax)
 
+;; Some useful MathJax stuff on this MathSE post:
+;;   https://math.meta.stackexchange.com/questions/5020/mathjax-basic-tutorial-and-quick-reference
+
 (define (separate-text-by-pred text pred)
   (define (group->text-pair group group-matches-pred?)
     (cons group-matches-pred? (list->string (reverse group))))
