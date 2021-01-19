@@ -1,15 +1,28 @@
 #lang racket
 
-(provide (all-defined-out))
+(provide (all-defined-out)
+         mt-env)
 
 (require "env.rkt"
          "utility.rkt"
          "values.rkt")
 
-;; Attempts to perform a single-step reduction of `exp`. Returns a pair:
+(define (interp exp)
+  (define (interp exp env rules)
+    (let*-values ([(new-exp new-env new-rules) (step exp env)]
+                  [(updated-rules) (cons new-rules rules)])
+      (if (empty? new-rules)
+          ;; No step was taken.
+          (values new-exp updated-rules)
+          ;; A step was taken.
+          (interp new-exp new-env updated-rules))))
+  (interp exp prelude-env '()))
+
+;; Attempts to perform a single-step reduction of `exp`. Returns a triple:
 ;;
 ;; 1. The returned expression.
-;; 2. `#f` if the returned expression is identical to the input expression
+;; 2. The returned environment.
+;; 3. `#f` if the returned expression is identical to the input expression
 ;;    (i.e., if no reduction occurred), or else a symbol naming the rule
 ;;    responsible for the reduction.
 ;;
@@ -17,21 +30,27 @@
 ;;       list with the inner-most rules to the end. (This is still a "small
 ;;       step" since only a single reduction is performed.)
 (define (step exp env)
-  (define (return-change new-exp rule)
-    (values new-exp rule))
+  (define (return-change new-exp new-env rule)
+    (values new-exp new-env rule))
   (define (return-no-change)
-    (values exp #f))
-  (define (recur-step sub-exp change-func outer-rule)
+    (values exp env '()))
+  (define (recur-step sub-exp sub-env change-func outer-rule)
     ;; This should only be called when we expect sub-exp to reduce.
-    (let-values ([(sub-exp-result inner-rule) (step sub-exp env)])
+    (let-values ([(new-exp new-env inner-rule) (step sub-exp sub-env)])
       (return-change
-       (change-func sub-exp-result)
-       (cons outer-rule inner-rule))))
+       (change-func new-exp)
+       new-env
+       (cons inner-rule inner-rule))))
   (match exp
     ;; VALUES
     [(? value?)
      ;; The input expression is already fully reduced.
      (return-no-change)]
+    ;; INTEGERS
+    [(? integer?)
+     (return-change (int exp)
+                    env
+                    'V-Integer)]
     ;; SYMBOLS
     [(? symbol?)
      ;; Attempt to look up symbols in the environment. If no binding exists,
@@ -39,8 +58,10 @@
      (let ([lookup (env-lookup env exp)])
        (if lookup
            (return-change lookup
+                          env
                           'E-Substitute)
            (return-change (err (format "free variable: ~a" exp))
+                          env
                           'Err-Substitute)))]
     ;; SUPERPOSITIONS
     [`(,(or 'σ 'sigma) ,lhs ,rhs)
@@ -48,25 +69,31 @@
        [(cons (? err?) (? err?))
         ;; Reduction results in an error either way.
         (return-change
+         env
          ;; TODO: Maybe include the inner errors' messages?
          (err "erroneous superposition")
          'Err-Superposition)]
        [(cons (? err?) _)
         (return-change rhs
+                       env
                        'E-SuperpositionErrorReduce1)]
        [(cons _ (? err?))
         (return-change lhs
+                       env
                        'E-SuperpositionErrorReduce2)]
        [(cons (? value?) (? value?))
         (return-change (superposition lhs rhs)
+                       env
                        'V-Superposition)]
        [(cons (? value?) _)
         (recur-step rhs
+                    env
                     (λ (new-rhs)
                       `(σ ,lhs ,new-rhs))
                     'E-SuperpositionReduce2)]
        [_
         (recur-step lhs
+                    env
                     (λ (new-lhs)
                       `(σ ,new-lhs ,rhs))
                     'E-SuperpositionReduce1)])]
@@ -76,6 +103,7 @@
        [(list)
         ;; A nullary function.
         (return-change (closure env #f body)
+                       env
                        'V-NullaryFunction)]
        [(list formal formals ...)
         ;; A 1+-argument function.
@@ -85,9 +113,11 @@
                 ;; The first formal given is a variadic ellipsis, which is only
                 ;; allowed as the final parameter of a function.
                 (return-change (err "non-final variadic ellipsis")
+                               env
                                'Err-NonFinalVariadicEllipsis)
                 ;; The first formal given is something else.
                 (return-change (err (format "invalid formal: ~a" formal))
+                               env
                                'Err-InvalidFormalParameter))
             ;; Look at the structure of the remaining formals.
             (match formals
@@ -95,6 +125,7 @@
                ;; There are no additional formal parameters, so we have a unary
                ;; function.
                (return-change (closure env (param formal) body)
+                              env
                               'V-UnaryFunction)]
               [(list '...)
                ;; Variadic functions are defined by supplying a single formal
@@ -116,31 +147,111 @@
                        (ffi-closure? (cdar env)))
                    ;; The environment doesn't support a variadic function.
                    (return-change (err "variadic functions may only be defined within the body of another function")
+                                  env
                                   'Err-InvalidVariadicFunction)
                    ;; We can build a variadic function, so do it!
                    (return-change (variadic-closure env (param formal) body)
+                                  env
                                   'V-VariadicFunction))]
               [_
                ;; We have a non-empty list of additional formal parameters. Now
                ;; we curry it!
                (return-change (closure env (param formal) `(λ ,formals ,body))
+                              env
                               'E-Curry)]))])]
     ;; APPLICATIONS
-    [`(,aplicee ,args ...)
-     (if (ffi-closure? aplicee)
-         #f  ;; FIXME
+    ;; TODO: The aplicée must be interpreted before even currying is done.
+    [`(,aplicée ,args ...)
+     ;; aplicée, noun [French]: that which has been applied
+     ;; (I couldn't think of a better name for it, since the semantics allow for
+     ;; either functions or superpositions to be used here.)
+     (if (ffi-closure? aplicée)
+         (let-values ([(values not-value not-values) (member-partition value? args)])
+           (if (empty? not-values)
+               ;; All arguments are values. Apply!
+               (return-change (apply (ffi-closure-func aplicée) values)
+                              env
+                              'E-AppFFI)
+               ;; We need to reduce the next argument.
+               (recur-step not-value
+                           (λ (new-value)
+                             `(,aplicée ,@values ,new-value ,@not-values))
+                           env
+                           'E-AppReduceFFI)))
          (match args
            [(list)
             ;; Nullary application.
-            #f]  ;; FIXME
+            (if (not (value? aplicée))
+                ;; We must reduce the function before we can apply it.
+                (recur-step aplicée
+                            env
+                            (λ (new-aplicée)
+                              `(,new-aplicée))
+                            'E-AppReduceNullary)
+                ;; Apply the function... to nothing! (We just extract the body.)
+                (match aplicée
+                  [(closure c-env #f c-body)
+                   (return-change c-body
+                                  c-env
+                                  'E-AppNullary)]
+                  [_
+                   (return-change (err (format "nullary application of non-nullary function: ~a" aplicée))
+                                  env
+                                  'Err-AppNullary)]))]
            [(list arg)
             ;; Unary application.
-            #f]  ;; FIXME
+            (cond
+              [(not (value? aplicée))
+               ;; We must reduce the function before we can apply it.
+               (recur-step aplicée
+                           env
+                           (λ (new-aplicée)
+                             `(,new-aplicée ,arg))
+                           'E-AppReduce1)]
+              [(not (value? arg))
+               ;; Reduce the argument.
+               (recur-step arg
+                           env
+                           (λ (new-arg)
+                             `(,aplicée ,new-arg))
+                           'E-AppReduce2)]
+              [(superposition? arg)
+               ;; Superpositional arguments are distributed.
+               (match arg
+                 [(superposition lhs rhs)
+                  (return-change `(σ (,aplicée ,lhs) (,aplicée ,rhs))
+                                 env
+                                 'E-AppReduce3)])]
+              [else
+               ;; Actually apply the thing! (Hopefully...)
+               (match aplicée
+                 [(variadic-closure vc-env (param vc-formal-name) vc-body)
+                  (match vc-env
+                    [`((,last-formal . ,_) ,old-env ...)
+                     (return-change `(σ ,vc-body ,(variadic-closure (extend-env last-formal vc-body old-env)
+                                                                    (param vc-formal-name)
+                                                                    vc-body))
+                                    env
+                                    'E-AppVariadic)])]
+                 [(closure c-env (param c-formal-name) c-body)
+                  (return-change c-body
+                                 (extend-env c-formal-name arg c-env)
+                                 'E-AppUnary)]
+                 [(superposition lhs rhs)
+                  (return-change `(σ (,lhs ,arg) (,rhs ,arg))
+                                 env
+                                 'E-AppSuperposition)]
+                 [_
+                  (return-change (err (format "invalid aplicée: ~a" aplicée))
+                                 env
+                                 'Err-App)])])]
            [(list arg args ...)
             ;; Multary application in need of uncurrying.
-            (return-change `((,aplicee ,arg) ,@args)
+            (return-change `((,aplicée ,arg) ,@args)
+                           env
                            'E-AppUncurry)]))]
     ;; INVALID
     [_
      (return-change (err (format "invalid input: ~a" exp))
+                    env
                     'Err-InvalidInput)]))

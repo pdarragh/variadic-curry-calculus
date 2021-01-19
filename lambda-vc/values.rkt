@@ -1,7 +1,8 @@
 #lang racket
 
 (provide (all-defined-out)
-         (struct-out value))
+         (struct-out value)
+         (struct-out ffi-closure))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -20,6 +21,20 @@
 ;; Error messages are wrapped in structs so superposition collapsing can avoid
 ;; installing error handlers.
 (struct err value (message) #:transparent)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; INTEGER
+;;
+
+;; Integers are wrapped in structs to make value-checking easy.
+(struct int value (int)
+  #:methods gen:custom-write
+  [(define (write-proc i port mode)
+     (match i
+       [(int n)
+        (write-string (format "~a" n)
+                      port)]))])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

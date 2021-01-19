@@ -14,13 +14,29 @@
 
 ;; Like findf, but instead of only returning the found item (or #f) this version
 ;; returns the item and the index at which it was found (or #f if not found).
-(define (findf+index proc lst)
+(define (findf+index pred lst)
   (define (findf+index lst index)
     (match lst
       [(list)
        #f]
       [(list item rest-lst ...)
-       (if (proc item)
+       (if (pred item)
            (cons item index)
            (findf+index rest-lst (add1 index)))]))
   (findf+index lst 0))
+
+;; A mix of member and partition. Given a predicate and a list, finds the first
+;; element of the list that satisfies the predicate. If found, a triple is
+;; returned consisting of the list prior to the element, the element, and the
+;; list after the element. If the element is not found, the triple will contain
+;; the input list, #f, and an empty list.
+(define (member-partition pred lst)
+  (define (member-partition processed remaining)
+    (match remaining
+      [(list)
+       (values (reverse processed) #f remaining)]
+      [(list item rest-remaining ...)
+       (if (pred item)
+           (values (reverse processed) item rest-remaining)
+           (member-partition (cons item processed) rest-remaining))]))
+  (member-partition '() lst))
