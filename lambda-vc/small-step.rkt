@@ -2,27 +2,9 @@
 
 (provide (all-defined-out))
 
-(require "env.rkt")
-
-;; All "values" are sub-types of the value struct. This way, we can use the
-;; predicate `value?` to determine all values.
-(struct value ())
-
-;; Error messages are wrapped in structs so superposition collapsing can avoid
-;; installing error handlers.
-(struct err-value value (message) #:transparent)
-
-;; TODO
-(struct superposition-value value (lhs rhs))
-
-;; Superpositions are just two grouped inner expressions.
-(struct superposition (lhs rhs)
-  #:methods gen:custom-write
-  [(define (write-proc s port mode)
-     (match s
-       [(superposition lv rv)
-        (write-string (format "(σ ~a ~a)" lv rv)
-                      port)]))])
+(require "env.rkt"
+         "utility.rkt"
+         "values.rkt")
 
 ;; Attempts to perform a single-step reduction of `exp`. Returns a pair:
 ;;
@@ -48,6 +30,7 @@
   (match exp
     ;; VALUES
     [(? value?)
+     ;; The input expression is already fully reduced.
      (return-no-change)]
     ;; SYMBOLS
     [(? symbol?)
@@ -57,35 +40,107 @@
        (if lookup
            (return-change lookup
                           'E-Substitute)
-           (return-change (err-value (format "free variable: ~a" exp))
+           (return-change (err (format "free variable: ~a" exp))
                           'Err-Substitute)))]
     ;; SUPERPOSITIONS
-    [(superposition lhs rhs)
+    [`(,(or 'σ 'sigma) ,lhs ,rhs)
      (match (cons lhs rhs)
-       [(cons (? err-value?) (? err-value?))
+       [(cons (? err?) (? err?))
         ;; Reduction results in an error either way.
         (return-change
-         (err-value "erroneous superposition")
+         ;; TODO: Maybe include the inner errors' messages?
+         (err "erroneous superposition")
          'Err-Superposition)]
-       [(cons (? err-value?) _)
-        (return-change rhs 'E-SuperpositionErrorReduce1)]
-       [(cons _ (? err-value?))
-        (return-change lhs 'E-SuperpositionErrorReduce2)]
+       [(cons (? err?) _)
+        (return-change rhs
+                       'E-SuperpositionErrorReduce1)]
+       [(cons _ (? err?))
+        (return-change lhs
+                       'E-SuperpositionErrorReduce2)]
+       [(cons (? value?) (? value?))
+        (return-change (superposition lhs rhs)
+                       'V-Superposition)]
        [(cons (? value?) _)
-        (recur-step
-         rhs
-         (λ (new-rhs)
-           (if (value? new-rhs)
-               (superposition-value lhs new-rhs)
-               (superposition lhs new-rhs)))
-         'E-SuperpositionReduce2)]
+        (recur-step rhs
+                    (λ (new-rhs)
+                      `(σ ,lhs ,new-rhs))
+                    'E-SuperpositionReduce2)]
        [_
-        (recur-step
-         lhs
-         (λ (new-lhs) (superposition new-lhs rhs))
-         'E-SuperpositionReduce1)])]
+        (recur-step lhs
+                    (λ (new-lhs)
+                      `(σ ,new-lhs ,rhs))
+                    'E-SuperpositionReduce1)])]
     ;; FUNCTIONS
-    [`(,(or 'λ 'λ ) (,formals ...) ,body)
+    [`(,(or 'λ 'lambda) (,formals ...) ,body)
      (match formals
        [(list)
-        #f])]))  ;; FIXME
+        ;; A nullary function.
+        (return-change (closure env #f body)
+                       'V-NullaryFunction)]
+       [(list formal formals ...)
+        ;; A 1+-argument function.
+        (if (not (valid-formal? formal))
+            ;; The first formal given is not valid.
+            (if (eq? formal '...)
+                ;; The first formal given is a variadic ellipsis, which is only
+                ;; allowed as the final parameter of a function.
+                (return-change (err "non-final variadic ellipsis")
+                               'Err-NonFinalVariadicEllipsis)
+                ;; The first formal given is something else.
+                (return-change (err (format "invalid formal: ~a" formal))
+                               'Err-InvalidFormalParameter))
+            ;; Look at the structure of the remaining formals.
+            (match formals
+              [(list)
+               ;; There are no additional formal parameters, so we have a unary
+               ;; function.
+               (return-change (closure env (param formal) body)
+                              'V-UnaryFunction)]
+              [(list '...)
+               ;; Variadic functions are defined by supplying a single formal
+               ;; parameter with a trailing ellipsis.
+               ;;
+               ;; We only allow variadic functions to be defined within the
+               ;; body of another function, because the outer function's formal
+               ;; parameter will serve as the point at which to inject the
+               ;; superpositional return value in subsequent applications of
+               ;; the variadic function.
+               ;;
+               ;; TODO: At the moment, this check involves looking at the
+               ;;       environment to determine if it's either empty or has an
+               ;;       FFI function in the most-recently-bound position. This
+               ;;       is fragile, and an alternative encoding of environments
+               ;;       that separates the user's environment from the prelude
+               ;;       would be preferred.
+               (if (or (env-empty? env)
+                       (ffi-closure? (cdar env)))
+                   ;; The environment doesn't support a variadic function.
+                   (return-change (err "variadic functions may only be defined within the body of another function")
+                                  'Err-InvalidVariadicFunction)
+                   ;; We can build a variadic function, so do it!
+                   (return-change (variadic-closure env (param formal) body)
+                                  'V-VariadicFunction))]
+              [_
+               ;; We have a non-empty list of additional formal parameters. Now
+               ;; we curry it!
+               (return-change (closure env (param formal) `(λ ,formals ,body))
+                              'E-Curry)]))])]
+    ;; APPLICATIONS
+    [`(,aplicee ,args ...)
+     (if (ffi-closure? aplicee)
+         #f  ;; FIXME
+         (match args
+           [(list)
+            ;; Nullary application.
+            #f]  ;; FIXME
+           [(list arg)
+            ;; Unary application.
+            #f]  ;; FIXME
+           [(list arg args ...)
+            ;; Multary application in need of uncurrying.
+            (return-change `((,aplicee ,arg) ,@args)
+                           'E-AppUncurry)]))]
+    ;; INVALID
+    [_
+     (return-change (err (format "invalid input: ~a" exp))
+                    'Err-InvalidInput)]))
