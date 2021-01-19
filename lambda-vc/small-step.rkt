@@ -40,7 +40,7 @@
       (return-change
        (change-func new-exp)
        new-env
-       (cons inner-rule inner-rule))))
+       (flatten (list outer-rule inner-rule)))))
   (match exp
     ;; VALUES
     [(? value?)
