@@ -1,8 +1,13 @@
 #lang racket
 
-(provide (all-defined-out)
-         (struct-out value)
-         (struct-out ffi-closure))
+(provide (struct-out err)
+         (struct-out param)
+         (struct-out closure)
+         (struct-out variadic-closure)
+         (struct-out ffi-closure)
+         (struct-out superposition)
+         (rename-out [value-pred? value?]
+                     [not-value-pred? not-value?]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -13,6 +18,15 @@
 ;; predicate `value?` to determine all values.
 (struct value ())
 
+;; We include integers in the set of values.
+(define (value-pred? x)
+  (or (integer? x)
+      (value? x)))
+
+;; A convenience function for inverted predicates.
+(define (not-value-pred? x)
+  (not (value-pred? x)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; ERROR
@@ -21,20 +35,6 @@
 ;; Error messages are wrapped in structs so superposition collapsing can avoid
 ;; installing error handlers.
 (struct err value (message) #:transparent)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; INTEGER
-;;
-
-;; Integers are wrapped in structs to make value-checking easy.
-(struct int value (int)
-  #:methods gen:custom-write
-  [(define (write-proc i port mode)
-     (match i
-       [(int n)
-        (write-string (format "~a" n)
-                      port)]))])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -79,7 +79,8 @@
   [(define (write-proc fc port mode)
      (match fc
        [(ffi-closure _ name)
-        (write-string name port)]))])
+        (write-string (format "ϕ(~a)" name)
+                      port)]))])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

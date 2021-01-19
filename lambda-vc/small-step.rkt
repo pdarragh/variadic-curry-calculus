@@ -46,11 +46,6 @@
     [(? value?)
      ;; The input expression is already fully reduced.
      (return-no-change)]
-    ;; INTEGERS
-    [(? integer?)
-     (return-change (int exp)
-                    env
-                    'V-Integer)]
     ;; SYMBOLS
     [(? symbol?)
      ;; Attempt to look up symbols in the environment. If no binding exists,
@@ -160,96 +155,97 @@
                               env
                               'E-Curry)]))])]
     ;; APPLICATIONS
-    ;; TODO: The aplicée must be interpreted before even currying is done.
     [`(,aplicée ,args ...)
      ;; aplicée, noun [French]: that which has been applied
      ;; (I couldn't think of a better name for it, since the semantics allow for
      ;; either functions or superpositions to be used here.)
-     (if (ffi-closure? aplicée)
-         (let-values ([(values not-value not-values) (member-partition value? args)])
-           (if (empty? not-values)
-               ;; All arguments are values. Apply!
-               (return-change (apply (ffi-closure-func aplicée) values)
-                              env
-                              'E-AppFFI)
-               ;; We need to reduce the next argument.
-               (recur-step not-value
-                           (λ (new-value)
-                             `(,aplicée ,@values ,new-value ,@not-values))
-                           env
-                           'E-AppReduceFFI)))
-         (match args
-           [(list)
-            ;; Nullary application.
-            (if (not (value? aplicée))
-                ;; We must reduce the function before we can apply it.
-                (recur-step aplicée
-                            env
-                            (λ (new-aplicée)
-                              `(,new-aplicée))
-                            'E-AppReduceNullary)
-                ;; Apply the function... to nothing! (We just extract the body.)
-                (match aplicée
-                  [(closure c-env #f c-body)
-                   (return-change c-body
-                                  c-env
-                                  'E-AppNullary)]
-                  [_
-                   (return-change (err (format "nullary application of non-nullary function: ~a" aplicée))
-                                  env
-                                  'Err-AppNullary)]))]
-           [(list arg)
-            ;; Unary application.
-            (cond
-              [(not (value? aplicée))
-               ;; We must reduce the function before we can apply it.
-               (recur-step aplicée
-                           env
-                           (λ (new-aplicée)
-                             `(,new-aplicée ,arg))
-                           'E-AppReduce1)]
-              [(not (value? arg))
-               ;; Reduce the argument.
-               (recur-step arg
-                           env
-                           (λ (new-arg)
-                             `(,aplicée ,new-arg))
-                           'E-AppReduce2)]
-              [(superposition? arg)
-               ;; Superpositional arguments are distributed.
-               (match arg
-                 [(superposition lhs rhs)
-                  (return-change `(σ (,aplicée ,lhs) (,aplicée ,rhs))
-                                 env
-                                 'E-AppReduce3)])]
-              [else
-               ;; Actually apply the thing! (Hopefully...)
-               (match aplicée
-                 [(variadic-closure vc-env (param vc-formal-name) vc-body)
-                  (match vc-env
-                    [`((,last-formal . ,_) ,old-env ...)
-                     (return-change `(σ ,vc-body ,(variadic-closure (extend-env last-formal vc-body old-env)
-                                                                    (param vc-formal-name)
-                                                                    vc-body))
-                                    env
-                                    'E-AppVariadic)])]
-                 [(closure c-env (param c-formal-name) c-body)
-                  (return-change c-body
-                                 (extend-env c-formal-name arg c-env)
-                                 'E-AppUnary)]
-                 [(superposition lhs rhs)
-                  (return-change `(σ (,lhs ,arg) (,rhs ,arg))
-                                 env
-                                 'E-AppSuperposition)]
-                 [_
-                  (return-change (err (format "invalid aplicée: ~a" aplicée))
-                                 env
-                                 'Err-App)])])]
-           [(list arg args ...)
-            ;; Multary application in need of uncurrying.
-            (return-change `((,aplicée ,arg) ,@args)
-                           env
-                           'E-AppUncurry)]))]
+     (cond
+       [(not (value? aplicée))
+        ;; The aplicée has to be reduced before anything else. This is because
+        ;; the presence of FFI functions prohibits us from currying arguments in
+        ;; FFI calls, so we have to fully reduce the aplicée to determine
+        ;; whether it's an ffi-closure that we should apply without currying
+        ;; anything.
+        (recur-step aplicée
+                    env
+                    (λ (new-aplicée)
+                      `(,new-aplicée ,@args))
+                    'E-AppReduceAplicée)]
+       [(ffi-closure? aplicée)
+        ;; Since we have an FFI function, we must apply it without currying the
+        ;; arguments. (This is unfortunate, and the semantics would be nicer if
+        ;; we could avoid this.)
+        (let-values ([(values not-value not-values) (member-partition not-value? args)])
+          (if (empty? not-values)
+              ;; All arguments are values. Apply!
+              (return-change (apply (ffi-closure-func aplicée) values)
+                             env
+                             'E-AppFFI)
+              ;; We need to reduce the next argument.
+              (recur-step not-value
+                          (λ (new-value)
+                            `(,aplicée ,@values ,new-value ,@not-values))
+                          env
+                          'E-AppReduceFFI)))]
+       [else
+        ;; Other forms of application look at the arguments next.
+        (match args
+          [(list)
+           ;; Nullary application. We just extract the body.
+           (match aplicée
+             [(closure c-env #f c-body)
+              (return-change c-body
+                             c-env
+                             'E-AppNullary)]
+             [_
+              (return-change (err (format "nullary application of non-nullary function: ~a" aplicée))
+                             env
+                             'Err-AppNullary)])]
+          [(list arg)
+           ;; Unary application.
+           (cond
+             [(not (value? arg))
+              ;; Reduce the argument.
+              (recur-step arg
+                          env
+                          (λ (new-arg)
+                            `(,aplicée ,new-arg))
+                          'E-AppReduceArgument)]
+             [(superposition? arg)
+              ;; Superpositional arguments are distributed.
+              (match arg
+                [(superposition lhs rhs)
+                 (return-change `(σ (,aplicée ,lhs) (,aplicée ,rhs))
+                                env
+                                'E-AppReduceSuperposition)])]
+             [else
+              ;; Actually apply the thing! (Hopefully...)
+              (match aplicée
+                [(variadic-closure vc-env (param vc-formal-name) vc-body)
+                 (match vc-env
+                   [`((,last-formal . ,_) ,old-env ...)
+                    (return-change `(σ ,vc-body ,(variadic-closure (extend-env last-formal vc-body old-env)
+                                                                   (param vc-formal-name)
+                                                                   vc-body))
+                                   env
+                                   'E-AppVariadic)])]
+                [(closure c-env (param c-formal-name) c-body)
+                 (return-change c-body
+                                (extend-env c-formal-name arg c-env)
+                                'E-AppUnary)]
+                [(superposition lhs rhs)
+                 (return-change `(σ (,lhs ,arg) (,rhs ,arg))
+                                env
+                                'E-AppSuperposition)]
+                [_
+                 (return-change (err (format "invalid aplicée: ~a" aplicée))
+                                env
+                                'Err-App)])])]
+          [(list arg args ...)
+           ;; Multary application in need of uncurrying.
+           (return-change `((,aplicée ,arg) ,@args)
+                          env
+                          'E-AppUncurry)])])]
     ;; INVALID
     [_
      (return-change (err (format "invalid input: ~a" exp))
