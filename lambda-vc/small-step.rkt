@@ -1,13 +1,26 @@
 #lang racket
 
-(provide (all-defined-out)
-         mt-env)
+(provide interp)
 
 (require "env.rkt"
          "utility.rkt"
          "values.rkt")
 
-(define (interp exp)
+;; Fully interpret the input expression. The result is either the resulting
+;; reduced value on its own, or else a pair of the reduced value and the list of
+;; rules that led to its reduction (if `#:with-rules` is given a non-false
+;; value). By default, the prelude environment is used, but an alternate
+;; environment can be specified via `#:in-env`.
+(define (interp exp #:in-env [env prelude-env] #:with-rules [with-rules? #f])
+  (let-values ([(result-exp rules) (interp-with-rules exp env)])
+    (if with-rules?
+        (cons result-exp rules)
+        result-exp)))
+
+;; Fully interpret the input expression within the given environment, returning
+;; both the resulting reduced value as well as the list of rules that led to its
+;; reduction.
+(define (interp-with-rules exp env)
   (define (interp exp env rules)
     (let*-values ([(new-exp new-env new-rules) (step exp env)]
                   [(updated-rules) (cons new-rules rules)])
@@ -16,7 +29,7 @@
           (values new-exp updated-rules)
           ;; A step was taken.
           (interp new-exp new-env updated-rules))))
-  (interp exp prelude-env '()))
+  (interp exp env '()))
 
 ;; Attempts to perform a single-step reduction of `exp`. Returns a triple:
 ;;
