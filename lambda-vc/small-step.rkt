@@ -175,14 +175,14 @@
         ;; Since we have an FFI function, we must apply it without currying the
         ;; arguments. (This is unfortunate, and the semantics would be nicer if
         ;; we could avoid this.)
-        (let-values ([(values not-value not-values) (member-partition not-value? args)])
+        (let-values ([(values first-not-value not-values) (member-partition not-value? args)])
           (if (empty? not-values)
               ;; All arguments are values. Apply!
               (return-change (apply (ffi-closure-func aplicée) values)
                              env
                              'E-AppFFI)
               ;; We need to reduce the next argument.
-              (recur-step not-value
+              (recur-step first-not-value
                           (λ (new-value)
                             `(,aplicée ,@values ,new-value ,@not-values))
                           env
