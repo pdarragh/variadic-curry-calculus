@@ -177,15 +177,44 @@
         ;; we could avoid this.)
         (let-values ([(values first-not-value not-values) (member-partition not-value? args)])
           (if (empty? not-values)
-              ;; All arguments are values. Apply!
-              (return-change (apply (ffi-closure-func aplicée) values)
-                             env
-                             'E-AppFFI)
+              ;; All arguments are values.
+              ;;
+              ;; Now we have to check if there are any superpositions in the
+              ;; list of arguments. Application to superpositions causes a
+              ;; fork in execution (itself represented as a superposition), so
+              ;; we have to factor out each superpositional argument as a
+              ;; superpositional wrapper to the FFI function call.
+              (let-values ([(non-superpositions first-superposition unchecked-values)
+                            (member-partition superposition? values)])
+                (if (empty? unchecked-values)
+                    ;; There are no remaining superpositions in the list of
+                    ;; values, so we can actually call the function. We have to
+                    ;; wrap this call in an error handler that will wrap the
+                    ;; error in an err struct so that superpositional FFI
+                    ;; application will work as expected (i.e., a single failing
+                    ;; branch does not cause the entire program to fail).
+                    (return-change (with-handlers ([(λ (e) #t)
+                                                    (λ (e)
+                                                      (err "failure during FFI function application"))])
+                                     (apply (ffi-closure-func aplicée) values))
+                                   env
+                                   'E-AppFFI)
+                    ;; We found a superposition in the list of values. We will
+                    ;; factor it out to a top-level position surrounding the FFI
+                    ;; function call, extracting its inner values as arguments
+                    ;; to the wrapped call.
+                    (match first-superposition
+                      [(superposition lhs rhs)
+                       (let ([inner-lhs `(,aplicée ,@non-superpositions ,lhs ,@unchecked-values)]
+                             [inner-rhs `(,aplicée ,@non-superpositions ,rhs ,@unchecked-values)])
+                         (return-change `(σ ,inner-lhs ,inner-rhs)
+                                        env
+                                        'E-AppReduceFFISuperposition))])))
               ;; We need to reduce the next argument.
               (recur-step first-not-value
+                          env
                           (λ (new-value)
                             `(,aplicée ,@values ,new-value ,@not-values))
-                          env
                           'E-AppReduceFFI)))]
        [else
         ;; Other forms of application look at the arguments next.
