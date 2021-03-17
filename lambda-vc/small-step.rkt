@@ -23,39 +23,50 @@
 ;; both the resulting reduced value as well as the list of rules that led to its
 ;; reduction.
 (define (interp-with-rules exp env)
-  (define (interp exp env rules)
-    (let*-values ([(new-exp new-env new-rules) (step exp env)]
-                  [(updated-rules) (cons new-rules rules)])
+  (define (interp exp env rules rule-no)
+    (let*-values ([(new-exp new-env new-rules) (step exp env rule-no)]
+                  [(updated-rules) (append new-rules rules)]
+                  [(last-rule-no) (car (first updated-rules))])
       (if (empty? new-rules)
           ;; No step was taken.
           (values new-exp updated-rules)
           ;; A step was taken.
-          (interp new-exp new-env updated-rules))))
-  (interp exp env '()))
+          (interp new-exp new-env updated-rules (add1 last-rule-no)))))
+  (interp exp env (list (list 0 'E-Original (format "~v" exp))) 1))
 
 ;; Attempts to perform a single-step reduction of `exp`. Returns a triple:
 ;;
 ;; 1. The returned expression.
 ;; 2. The returned environment.
 ;; 3. `#f` if the returned expression is identical to the input expression
-;;    (i.e., if no reduction occurred), or else a symbol naming the rule
-;;    responsible for the reduction.
+;;    (i.e., if no reduction occurred). Otherwise, returns a list containing an
+;;    inner list consisting of an integer, the symbol naming the rule
+;;    responsible for the reduction, and a string form of the expression
+;;    resulting from the reduction. The integer represents the rule's
+;;    application number in the interpretation, relative to the given
+;;    application number.
 ;;
-;; NOTE: If multiple rules are applied in one step, the rules are returned as a
-;;       list with the inner-most rules to the end. (This is still a "small
-;;       step" since only a single reduction is performed.)
-(define (step exp env)
+;; NOTE: If multiple rules are applied in one step, the list returned in the
+;;       third position of the triple will contain a list for each of them.
+;;
+;; NOTE: The fact that multiple steps can be taken in a single step is perhaps
+;;       odd. This could be mitigated by using continuations or evaluation
+;;       contexts, or else by losing some information about rule application.
+;;       However, I chose to take this path as it seemed simplest for my needs.
+(define (step exp env [rule-no 1])
   (define (return-change new-exp new-env rule)
-    (values new-exp new-env rule))
+    (values new-exp new-env (if (list? rule)
+                                rule
+                                (list (list rule-no rule (format "~v" new-exp))))))
   (define (return-no-change)
     (values exp env '()))
   (define (recur-step sub-exp sub-env change-func outer-rule)
     ;; This should only be called when we expect sub-exp to reduce.
-    (let-values ([(new-exp new-env inner-rule) (step sub-exp sub-env)])
+    (let-values ([(new-exp new-env inner-rule) (step sub-exp sub-env rule-no)])
       (return-change
        (change-func new-exp)
        new-env
-       (flatten (list outer-rule inner-rule)))))
+       (cons (list (add1 rule-no) outer-rule (format "~v" new-exp)) inner-rule))))
   (match exp
     ;; VALUES
     [(? value?)
