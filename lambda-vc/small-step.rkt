@@ -11,7 +11,9 @@
 ;; rules that led to its reduction (if `#:with-rules` is given a non-false
 ;; value). By default, the prelude environment is used, but an alternate
 ;; environment can be specified via `#:in-env`.
-(define (interp exp #:in-env [env prelude-env] #:with-rules [with-rules? #f])
+(define (interp exp
+                #:in-env [env prelude-env]
+                #:with-rules [with-rules? #f])
   (let-values ([(result-exp rules) (interp-with-rules exp env)])
     (if with-rules?
         (cons result-exp rules)
