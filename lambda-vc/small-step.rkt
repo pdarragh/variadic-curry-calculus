@@ -32,7 +32,7 @@
           (values new-exp updated-rules)
           ;; A step was taken.
           (interp new-exp new-env updated-rules (add1 last-rule-no)))))
-  (interp exp env (list (list 0 'E-Original (format "~v" exp))) 1))
+  (interp exp env (list (list 0 'E-Original `,exp)) 1))
 
 ;; Attempts to perform a single-step reduction of `exp`. Returns a triple:
 ;;
@@ -57,7 +57,8 @@
   (define (return-change new-exp new-env rule)
     (values new-exp new-env (if (list? rule)
                                 rule
-                                (list (list rule-no rule (format "~v" new-exp))))))
+                                (list (list rule-no rule `,exp '--> `,new-exp))
+                                #;(list (list rule-no rule (format "~v --> ~v" exp new-exp))))))
   (define (return-no-change)
     (values exp env '()))
   (define (recur-step sub-exp sub-env change-func outer-rule)
@@ -66,7 +67,11 @@
       (return-change
        (change-func new-exp)
        new-env
-       (cons (list (add1 rule-no) outer-rule (format "~v" new-exp)) inner-rule))))
+       (cons (list (add1 rule-no)
+                   outer-rule
+                   `,exp
+                   '-->
+                   `,new-exp) inner-rule))))
   (match exp
     ;; VALUES
     [(? value?)
